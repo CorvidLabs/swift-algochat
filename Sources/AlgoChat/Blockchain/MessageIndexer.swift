@@ -57,7 +57,9 @@ public actor MessageIndexer {
                 direction = .sent
             } else {
                 // We received this message
-                guard tx.sender == participant.description else {
+                guard tx.sender == participant.description,
+                      let payment = tx.paymentTransaction,
+                      payment.receiver == chatAccount.address.description else {
                     continue
                 }
                 direction = .received
@@ -97,6 +99,10 @@ public actor MessageIndexer {
                 otherAddress = payment.receiver
                 direction = .sent
             } else {
+                guard let payment = tx.paymentTransaction,
+                      payment.receiver == chatAccount.address.description else {
+                    continue
+                }
                 otherAddress = tx.sender
                 direction = .received
             }

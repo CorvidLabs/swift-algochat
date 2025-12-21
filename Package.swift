@@ -19,6 +19,10 @@ let package = Package(
         .executable(
             name: "algochat-demo",
             targets: ["AlgoChatDemo"]
+        ),
+        .executable(
+            name: "demo",
+            targets: ["Demo"]
         )
     ],
     dependencies: [
@@ -39,6 +43,13 @@ let package = Package(
             dependencies: [
                 "AlgoChat",
                 .product(name: "CLI", package: "swift-cli")
+            ]
+        ),
+        .executableTarget(
+            name: "Demo",
+            dependencies: [
+                "AlgoChat",
+                .product(name: "AlgoKit", package: "swift-algokit")
             ]
         ),
         .testTarget(
