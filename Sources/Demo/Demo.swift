@@ -386,7 +386,10 @@ struct Demo {
         }
     }
 
-    static func waitForPublicKey(chat: AlgoChat, address: Address, maxAttempts: Int = 30) async throws {
+    static func waitForPublicKey(chat: AlgoChat, address: Address, maxAttempts: Int = 60) async throws {
+        // Give the indexer a moment to process new transactions
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+
         for _ in 0..<maxAttempts {
             do {
                 _ = try await chat.fetchPublicKey(for: address)
