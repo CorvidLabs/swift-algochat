@@ -75,6 +75,12 @@ public actor MessageIndexer {
     }
 
     /// Fetches all conversations for the current account
+    ///
+    /// Scans recent transactions to discover all chat participants and their
+    /// message history. Conversations are sorted by most recent message.
+    ///
+    /// - Parameter limit: Maximum number of transactions to scan (default: 100)
+    /// - Returns: Array of conversations sorted by most recent activity
     public func fetchConversations(limit: Int = 100) async throws -> [Conversation] {
         let response = try await indexerClient.searchTransactions(
             address: chatAccount.address,

@@ -1,12 +1,19 @@
 import Algorand
 import Foundation
 
-/// Result of sending a message
+/// Result of a successful send operation
+///
+/// Contains both the transaction ID for blockchain tracking and an optimistic
+/// copy of the sent message for immediate local UI updates without waiting
+/// for indexer confirmation.
 public struct SendResult: Sendable {
-    /// Transaction ID
+    /// The Algorand transaction ID
     public let txid: String
 
-    /// The sent message (for optimistic local updates)
+    /// The sent message for optimistic local updates
+    ///
+    /// This message can be immediately appended to a conversation's message
+    /// list to show the sent message before the indexer catches up.
     public let message: Message
 
     public init(txid: String, message: Message) {
