@@ -75,12 +75,17 @@ struct MessageEncryptorTests {
             recipientPublicKey: recipientPrivateKey.publicKey
         )
 
-        let decryptedMessage = try MessageEncryptor.decrypt(
+        guard let decrypted = try MessageEncryptor.decrypt(
             envelope: envelope,
             recipientPrivateKey: recipientPrivateKey
-        )
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
 
-        #expect(decryptedMessage == originalMessage)
+        #expect(decrypted.text == originalMessage)
+        #expect(decrypted.replyToId == nil)
+        #expect(decrypted.replyToPreview == nil)
     }
 
     @Test("Message with unicode characters")
@@ -96,12 +101,15 @@ struct MessageEncryptorTests {
             recipientPublicKey: recipientPrivateKey.publicKey
         )
 
-        let decryptedMessage = try MessageEncryptor.decrypt(
+        guard let decrypted = try MessageEncryptor.decrypt(
             envelope: envelope,
             recipientPrivateKey: recipientPrivateKey
-        )
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
 
-        #expect(decryptedMessage == originalMessage)
+        #expect(decrypted.text == originalMessage)
     }
 
     @Test("Message too large throws error")
@@ -138,6 +146,135 @@ struct MessageEncryptorTests {
                 recipientPrivateKey: wrongPrivateKey
             )
         }
+    }
+
+    @Test("Reply message encryption round trip preserves metadata")
+    func testReplyEncryptionRoundTrip() throws {
+        let senderPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+
+        let replyText = "This is my reply!"
+        let originalTxid = "TX123456789ABCDEF"
+        let originalPreview = "The original message that was sent"
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: replyText,
+            replyTo: (txid: originalTxid, preview: originalPreview),
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPrivateKey.publicKey
+        )
+
+        guard let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: recipientPrivateKey
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
+
+        #expect(decrypted.text == replyText)
+        #expect(decrypted.replyToId == originalTxid)
+        #expect(decrypted.replyToPreview == originalPreview)
+    }
+
+    @Test("Reply formatted content includes quoted preview")
+    func testReplyFormattedContent() throws {
+        let senderPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: "Yes, I agree!",
+            replyTo: (txid: "TX123", preview: "Do you want to proceed?"),
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPrivateKey.publicKey
+        )
+
+        guard let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: recipientPrivateKey
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
+
+        #expect(decrypted.formattedContent.contains("> Do you want to proceed?"))
+        #expect(decrypted.formattedContent.contains("Yes, I agree!"))
+    }
+
+    @Test("Reply preview truncates long original messages")
+    func testReplyPreviewTruncation() throws {
+        let senderPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+
+        let longOriginal = String(repeating: "x", count: 100)
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: "Reply!",
+            replyTo: (txid: "TX123", preview: longOriginal),
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPrivateKey.publicKey
+        )
+
+        guard let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: recipientPrivateKey
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
+
+        // Preview should be truncated to 80 chars (77 + "...")
+        #expect(decrypted.replyToPreview!.count == 80)
+        #expect(decrypted.replyToPreview!.hasSuffix("..."))
+    }
+
+    @Test("Plain text backward compatibility")
+    func testPlainTextBackwardCompatibility() throws {
+        let senderPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+
+        // Plain text message (old v1 format)
+        let plainMessage = "Just a plain message without JSON"
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: plainMessage,
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPrivateKey.publicKey
+        )
+
+        guard let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: recipientPrivateKey
+        ) else {
+            Issue.record("Expected non-nil decrypted content")
+            return
+        }
+
+        #expect(decrypted.text == plainMessage)
+        #expect(decrypted.replyToId == nil)
+        #expect(decrypted.formattedContent == plainMessage)
+    }
+
+    @Test("Key publish payload returns nil from decrypt")
+    func testKeyPublishPayloadReturnsNil() throws {
+        let privateKey = Curve25519.KeyAgreement.PrivateKey()
+
+        // Create key-publish payload
+        let payload = KeyPublishPayload()
+        let payloadData = try JSONEncoder().encode(payload)
+
+        let envelope = try MessageEncryptor.encryptRaw(
+            payloadData,
+            senderPrivateKey: privateKey,
+            recipientPublicKey: privateKey.publicKey
+        )
+
+        let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: privateKey
+        )
+
+        #expect(decrypted == nil)
     }
 }
 

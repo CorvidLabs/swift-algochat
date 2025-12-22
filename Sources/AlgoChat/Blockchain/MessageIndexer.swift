@@ -121,8 +121,10 @@ public actor MessageIndexer {
             }
         }
 
-        // Sort by most recent message
+        // Filter empty conversations (e.g., self-conversations with only key-publish)
+        // and sort by most recent message
         return Array(conversationsByAddress.values)
+            .filter { !$0.messages.isEmpty }
             .sorted { ($0.lastMessage?.timestamp ?? .distantPast) > ($1.lastMessage?.timestamp ?? .distantPast) }
     }
 
@@ -157,18 +159,22 @@ public actor MessageIndexer {
     private func parseMessage(
         from tx: IndexerTransaction,
         direction: Message.Direction
-    ) throws -> Message {
+    ) throws -> Message? {
         guard let noteData = tx.noteData else {
             throw ChatError.invalidEnvelope("No note data")
         }
 
         let envelope = try ChatEnvelope.decode(from: noteData)
 
-        // Decrypt the message
-        let content = try MessageEncryptor.decrypt(
+        // Decrypt the message (returns structured content with optional reply metadata)
+        // Returns nil for key-publish payloads, which should be filtered out
+        guard let decrypted = try MessageEncryptor.decrypt(
             envelope: envelope,
             recipientPrivateKey: chatAccount.encryptionPrivateKey
-        )
+        ) else {
+            // Key-publish payload - not a real message
+            return nil
+        }
 
         let sender = try Address(string: tx.sender)
 
@@ -188,10 +194,12 @@ public actor MessageIndexer {
             id: tx.id,
             sender: sender,
             recipient: recipient,
-            content: content,
+            content: decrypted.text,
             timestamp: timestamp,
             confirmedRound: tx.confirmedRound ?? 0,
-            direction: direction
+            direction: direction,
+            replyToId: decrypted.replyToId,
+            replyToPreview: decrypted.replyToPreview
         )
     }
 }

@@ -100,6 +100,9 @@ public actor AlgoChat {
         let pubKey: Curve25519.KeyAgreement.PublicKey
         if let provided = recipientPublicKey {
             pubKey = provided
+        } else if recipient == account.address {
+            // Self-messaging: use our own local key instead of fetching from indexer
+            pubKey = account.encryptionPublicKey
         } else {
             pubKey = try await fetchPublicKey(for: recipient)
         }
@@ -141,6 +144,88 @@ public actor AlgoChat {
         timeout: UInt64 = 10
     ) async throws -> String {
         let txid = try await send(message: message, to: recipient, recipientPublicKey: recipientPublicKey)
+        _ = try await algokit.algodClient.waitForConfirmation(
+            transactionID: txid,
+            timeout: timeout
+        )
+        return txid
+    }
+
+    // MARK: - Replying to Messages
+
+    /// Sends an encrypted reply to a previous message
+    ///
+    /// The reply includes metadata linking it to the original message, and the
+    /// content includes a quoted preview of the original for display in clients
+    /// that don't support threading.
+    ///
+    /// - Parameters:
+    ///   - message: The reply text
+    ///   - recipient: The recipient's Algorand address
+    ///   - original: The message being replied to
+    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
+    /// - Returns: The transaction ID
+    public func sendReply(
+        message: String,
+        to recipient: Address,
+        replyingTo original: Message,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil
+    ) async throws -> String {
+        // Get recipient's encryption public key
+        let pubKey: Curve25519.KeyAgreement.PublicKey
+        if let provided = recipientPublicKey {
+            pubKey = provided
+        } else if recipient == account.address {
+            pubKey = account.encryptionPublicKey
+        } else {
+            pubKey = try await fetchPublicKey(for: recipient)
+        }
+
+        // Encrypt the reply with metadata
+        let envelope = try MessageEncryptor.encrypt(
+            message: message,
+            replyTo: (txid: original.id, preview: original.content),
+            senderPrivateKey: account.encryptionPrivateKey,
+            recipientPublicKey: pubKey
+        )
+
+        // Get transaction parameters
+        let params = try await algokit.algodClient.transactionParams()
+
+        // Create and sign the transaction
+        let signedTx = try MessageTransaction.createSigned(
+            from: account,
+            to: recipient,
+            envelope: envelope,
+            params: params
+        )
+
+        // Submit transaction
+        return try await algokit.algodClient.sendTransaction(signedTx)
+    }
+
+    /// Sends a reply and waits for confirmation
+    ///
+    /// - Parameters:
+    ///   - message: The reply text
+    ///   - recipient: The recipient's Algorand address
+    ///   - original: The message being replied to
+    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
+    ///   - timeout: Maximum rounds to wait (default: 10)
+    /// - Returns: The transaction ID
+    public func sendReplyAndWait(
+        message: String,
+        to recipient: Address,
+        replyingTo original: Message,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil,
+        timeout: UInt64 = 10
+    ) async throws -> String {
+        let txid = try await sendReply(
+            message: message,
+            to: recipient,
+            replyingTo: original,
+            recipientPublicKey: recipientPublicKey
+        )
         _ = try await algokit.algodClient.waitForConfirmation(
             transactionID: txid,
             timeout: timeout
@@ -196,6 +281,57 @@ public actor AlgoChat {
         for address: Address
     ) async throws -> Curve25519.KeyAgreement.PublicKey {
         try await indexer.findPublicKey(for: address)
+    }
+
+    /// Publishes the account's encryption public key to the blockchain
+    ///
+    /// This creates a zero-value self-payment transaction containing the
+    /// encryption public key, allowing other users to discover it and send
+    /// encrypted messages without needing to receive a message first.
+    ///
+    /// The key-publish transaction is automatically filtered from the
+    /// conversation list.
+    ///
+    /// - Returns: The transaction ID
+    public func publishKey() async throws -> String {
+        // Create key-publish payload
+        let payload = KeyPublishPayload()
+        let payloadData = try JSONEncoder().encode(payload)
+
+        // Encrypt with our own key (self-encryption)
+        let envelope = try MessageEncryptor.encryptRaw(
+            payloadData,
+            senderPrivateKey: account.encryptionPrivateKey,
+            recipientPublicKey: account.encryptionPublicKey
+        )
+
+        // Get transaction parameters
+        let params = try await algokit.algodClient.transactionParams()
+
+        // Create zero-value self-payment (just publishes the key in the note)
+        let signedTx = try MessageTransaction.createSigned(
+            from: account,
+            to: account.address,
+            envelope: envelope,
+            params: params,
+            amount: MicroAlgos(0)
+        )
+
+        // Submit transaction
+        return try await algokit.algodClient.sendTransaction(signedTx)
+    }
+
+    /// Publishes the key and waits for confirmation
+    ///
+    /// - Parameter timeout: Maximum rounds to wait (default: 10)
+    /// - Returns: The transaction ID
+    public func publishKeyAndWait(timeout: UInt64 = 10) async throws -> String {
+        let txid = try await publishKey()
+        _ = try await algokit.algodClient.waitForConfirmation(
+            transactionID: txid,
+            timeout: timeout
+        )
+        return txid
     }
 
     // MARK: - Account Info

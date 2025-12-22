@@ -30,6 +30,12 @@ public struct Message: Sendable, Identifiable, Codable {
     /// Message direction
     public let direction: Direction
 
+    /// Transaction ID this message replies to (nil if not a reply)
+    public let replyToId: String?
+
+    /// Preview of the original message being replied to
+    public let replyToPreview: String?
+
     public init(
         id: String,
         sender: Address,
@@ -37,7 +43,9 @@ public struct Message: Sendable, Identifiable, Codable {
         content: String,
         timestamp: Date,
         confirmedRound: UInt64,
-        direction: Direction
+        direction: Direction,
+        replyToId: String? = nil,
+        replyToPreview: String? = nil
     ) {
         self.id = id
         self.sender = sender
@@ -46,6 +54,13 @@ public struct Message: Sendable, Identifiable, Codable {
         self.timestamp = timestamp
         self.confirmedRound = confirmedRound
         self.direction = direction
+        self.replyToId = replyToId
+        self.replyToPreview = replyToPreview
+    }
+
+    /// Whether this message is a reply to another message
+    public var isReply: Bool {
+        replyToId != nil
     }
 }
 

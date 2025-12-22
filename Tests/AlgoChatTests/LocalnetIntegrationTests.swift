@@ -376,6 +376,34 @@ struct LocalnetIntegrationTests {
 
         print("✅ Encryption security verified: Eve cannot read Alice-Bob messages")
     }
+
+    @Test("Publish key function works correctly")
+    func testPublishKey() async throws {
+        guard isLocalnetRunning() else {
+            print("⚠️ Skipping test: localnet is not running")
+            return
+        }
+
+        // Create and fund account
+        let account = try Account()
+        try fundAccount(account, amount: 10_000_000)
+        try await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Create chat
+        let chat = try await AlgoChat(configuration: .localnet(), account: account)
+
+        // Verify we have funds
+        let balance = try await chat.balance()
+        print("Account balance: \(balance.value) microAlgos")
+        #expect(balance.value >= 1_000_000, "Account should have funds")
+
+        // Test publishKey
+        print("Calling publishKeyAndWait()...")
+        let txid = try await chat.publishKeyAndWait()
+        print("Published key! TX: \(txid)")
+
+        #expect(!txid.isEmpty, "Should get a transaction ID")
+    }
 }
 
 // MARK: - Test Errors

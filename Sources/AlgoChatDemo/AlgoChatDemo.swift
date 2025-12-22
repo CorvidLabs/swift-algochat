@@ -9,6 +9,9 @@ struct AlgoChatDemo {
     // Shared key storage for biometric access
     static let keyStorage = KeychainKeyStorage()
 
+    // Selected network (set at startup)
+    nonisolated(unsafe) static var isLocalnet: Bool = true
+
     static func main() async {
         let terminal = Terminal.shared
 
@@ -35,23 +38,45 @@ struct AlgoChatDemo {
         var chat: AlgoChat?
 
         do {
+        // Network selection
+        let networkChoice = try await terminal.select(
+            "Select network",
+            options: [
+                "Localnet (local development)",
+                "TestNet (public test network)"
+            ]
+        )
+        isLocalnet = networkChoice.contains("Localnet")
+        let networkName = isLocalnet ? "Localnet" : "TestNet"
+        await terminal.writeLine("Network: \(networkName)".green)
+        await terminal.writeLine("")
+
         while true {
             if let account = currentAccount {
                 // Logged in menu
                 let shortAddr = String(account.address.description.prefix(8)) + "..."
-                await terminal.writeLine("Logged in as: ".dim + shortAddr.green.bold)
+                let networkLabel = isLocalnet ? "Localnet" : "TestNet"
+                await terminal.writeLine("Logged in as: ".dim + shortAddr.green.bold + " on ".dim + networkLabel.cyan)
                 await terminal.writeLine("")
+
+                var menuOptions = [
+                    "Send a message",
+                    "Check messages",
+                    "View conversations",
+                    "Publish encryption key",
+                    "Account info"
+                ]
+
+                // Only show fund option on localnet
+                if isLocalnet {
+                    menuOptions.append("Fund account")
+                }
+
+                menuOptions.append(contentsOf: ["Switch account", "Exit"])
 
                 let action = try await terminal.select(
                     "What would you like to do?",
-                    options: [
-                        "Send a message",
-                        "Check messages",
-                        "View conversations",
-                        "Account info",
-                        "Switch account",
-                        "Exit"
-                    ]
+                    options: menuOptions
                 )
 
                 switch action {
@@ -61,8 +86,12 @@ struct AlgoChatDemo {
                     try await checkMessages(chat: chat!, terminal: terminal)
                 case "View conversations":
                     try await viewConversations(chat: chat!, terminal: terminal)
+                case "Publish encryption key":
+                    try await publishEncryptionKey(chat: chat!, terminal: terminal)
                 case "Account info":
                     try await showAccountInfo(chat: chat!, account: account, terminal: terminal)
+                case "Fund account":
+                    await fundAccount(address: account.address, terminal: terminal)
                 case "Switch account":
                     currentAccount = nil
                     chat = nil
@@ -254,8 +283,12 @@ struct AlgoChatDemo {
         await terminal.writeLine("")
         await terminal.writeLine("⚠️  Save your mnemonic phrase securely!".yellow.bold)
         await terminal.writeLine("")
-        await terminal.writeLine("💰 Fund your account with TestNet ALGO:".dim)
-        await terminal.writeLine("   https://bank.testnet.algorand.network/".blue.underline)
+        if isLocalnet {
+            await terminal.writeLine("💰 Fund your account using the menu option.".dim)
+        } else {
+            await terminal.writeLine("💰 Fund your account with TestNet ALGO:".dim)
+            await terminal.writeLine("   https://bank.testnet.algorand.network/".blue.underline)
+        }
         await terminal.writeLine("")
 
         return account
@@ -289,11 +322,20 @@ struct AlgoChatDemo {
     }
 
     static func initChat(account: ChatAccount, terminal: Terminal) async throws -> AlgoChat {
-        try await terminal.withSpinner(
-            message: "Connecting to Algorand TestNet",
+        let networkName = isLocalnet ? "Localnet" : "TestNet"
+        return try await terminal.withSpinner(
+            message: "Connecting to Algorand \(networkName)",
             style: .dots
         ) {
-            try await AlgoChat(network: .testnet, account: account.account)
+            if isLocalnet {
+                let config = AlgorandConfiguration(
+                    network: .localnet,
+                    apiToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                )
+                return try await AlgoChat(configuration: config, account: account.account)
+            } else {
+                return try await AlgoChat(network: .testnet, account: account.account)
+            }
         }
     }
 
@@ -335,7 +377,9 @@ struct AlgoChatDemo {
             await terminal.writeLine("")
             await terminal.writeLine("✅ Message sent successfully!".green.bold)
             await terminal.writeLine("Transaction: ".dim + txid.cyan)
-            await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+            if !isLocalnet {
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+            }
         } catch ChatError.publicKeyNotFound {
             await terminal.writeLine("")
             await terminal.writeLine("⚠️  Recipient's encryption key not found.".yellow.bold)
@@ -366,24 +410,185 @@ struct AlgoChatDemo {
             return
         }
 
+        try await viewConversation(chat: chat, participant: from, terminal: terminal)
+    }
+
+    static func viewConversation(chat: AlgoChat, participant: Address, terminal: Terminal) async throws {
+        var allMessages: [Message] = []
+
+        // Initial load
         let messages = try await terminal.withSpinner(
             message: "Fetching messages",
             style: .dots
         ) {
-            try await chat.fetchMessages(with: from)
+            try await chat.fetchMessages(with: participant)
+        }
+        allMessages = messages
+
+        while true {
+            await terminal.writeLine("")
+
+            if allMessages.isEmpty {
+                await terminal.writeLine("No messages yet.".yellow)
+            } else {
+                let shortAddr = String(participant.description.prefix(12)) + "..."
+                let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
+                await terminal.writeLine("═══ Conversation with \(shortAddr.cyan) ═══ \(networkLabel)".bold)
+                await terminal.writeLine("")
+
+                // Display messages with improved formatting
+                for msg in allMessages {
+                    let time = formatRelativeTime(msg.timestamp)
+
+                    if msg.direction == .sent {
+                        // Sent message - right-aligned style
+                        await terminal.writeLine("                              \(time.dim)")
+                        // Show reply indicator BEFORE the message if this is a reply
+                        if let preview = msg.replyToPreview {
+                            let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
+                            await terminal.writeLine("                    " + "↳ \"\(truncated)\"".dim)
+                        }
+                        await terminal.writeLine("                    \(msg.content)".green + " [You]".dim)
+                    } else {
+                        // Received message - left-aligned style
+                        await terminal.writeLine("\(time.dim)")
+                        // Show reply indicator BEFORE the message if this is a reply
+                        if let preview = msg.replyToPreview {
+                            let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
+                            await terminal.writeLine("↳ \"\(truncated)\"".dim)
+                        }
+                        await terminal.writeLine("[Them] ".dim + msg.content.blue)
+                    }
+
+                    await terminal.writeLine("")
+                }
+            }
+
+            // Show action menu
+            let lastReceived = allMessages.last { $0.direction == .received }
+            var options = ["Send new message"]
+
+            if lastReceived != nil {
+                options.insert("Reply to last message", at: 0)
+            }
+
+            options.append(contentsOf: ["Refresh", "Back"])
+
+            let action = try await terminal.select(
+                "Actions",
+                options: options
+            )
+
+            switch action {
+            case "Reply to last message":
+                if let original = lastReceived {
+                    try await sendReply(chat: chat, to: participant, replyingTo: original, terminal: terminal)
+                    // Refresh messages after sending
+                    allMessages = try await chat.fetchMessages(with: participant)
+                }
+            case "Send new message":
+                try await sendMessageTo(chat: chat, recipient: participant, terminal: terminal)
+                // Refresh messages after sending
+                allMessages = try await chat.fetchMessages(with: participant)
+            case "Refresh":
+                allMessages = try await terminal.withSpinner(
+                    message: "Refreshing",
+                    style: .dots
+                ) {
+                    try await chat.fetchMessages(with: participant)
+                }
+            case "Back":
+                return
+            default:
+                break
+            }
+        }
+    }
+
+    static func sendMessageTo(chat: AlgoChat, recipient: Address, terminal: Terminal) async throws {
+        let message = try await terminal.input("Your message")
+
+        if message.isEmpty {
+            await terminal.writeLine("Cancelled.".yellow)
+            return
         }
 
-        await terminal.writeLine("")
-        if messages.isEmpty {
-            await terminal.writeLine("No messages found.".yellow)
-        } else {
-            await terminal.writeLine("═══ Messages ═══".cyan.bold)
-            await terminal.writeLine("")
-            for msg in messages {
-                let arrow = msg.direction == .sent ? "→".green : "←".blue
-                let time = formatDate(msg.timestamp)
-                await terminal.writeLine("\(arrow) [\(time.dim)] \(msg.content)")
+        do {
+            let txid = try await terminal.withSpinner(
+                message: "Sending",
+                style: .dots
+            ) {
+                try await chat.sendAndWait(message: message, to: recipient)
             }
+
+            await terminal.writeLine("✅ Sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
+            if !isLocalnet {
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+            }
+        } catch {
+            await terminal.writeLine("❌ Failed: \(error.localizedDescription)".red)
+        }
+    }
+
+    static func sendReply(
+        chat: AlgoChat,
+        to recipient: Address,
+        replyingTo original: Message,
+        terminal: Terminal
+    ) async throws {
+        await terminal.writeLine("")
+        let preview = original.content.count > 50
+            ? String(original.content.prefix(47)) + "..."
+            : original.content
+        await terminal.writeLine("Replying to: ".dim + "\"\(preview)\"".cyan)
+
+        let reply = try await terminal.input("Your reply")
+
+        if reply.isEmpty {
+            await terminal.writeLine("Cancelled.".yellow)
+            return
+        }
+
+        do {
+            let txid = try await terminal.withSpinner(
+                message: "Sending reply",
+                style: .dots
+            ) {
+                try await chat.sendReplyAndWait(message: reply, to: recipient, replyingTo: original)
+            }
+
+            await terminal.writeLine("✅ Reply sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
+            if !isLocalnet {
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+            }
+        } catch {
+            await terminal.writeLine("❌ Failed: \(error.localizedDescription)".red)
+        }
+    }
+
+    static func publishEncryptionKey(chat: AlgoChat, terminal: Terminal) async throws {
+        await terminal.writeLine("")
+        await terminal.writeLine("Publishing your encryption key allows others to message you".dim)
+        await terminal.writeLine("even before you've sent them a message.".dim)
+        await terminal.writeLine("")
+
+        do {
+            let txid = try await terminal.withSpinner(
+                message: "Publishing encryption key",
+                style: .dots
+            ) {
+                try await chat.publishKeyAndWait()
+            }
+
+            await terminal.writeLine("")
+            await terminal.writeLine("Key published successfully!".green.bold)
+            await terminal.writeLine("Transaction: ".dim + txid.cyan)
+            if !isLocalnet {
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+            }
+        } catch {
+            await terminal.writeLine("")
+            await terminal.writeLine("Failed to publish key: \(error.localizedDescription)".red)
         }
     }
 
@@ -400,18 +605,38 @@ struct AlgoChatDemo {
             await terminal.writeLine("No conversations yet.".yellow)
             await terminal.writeLine("Send a message to start chatting!".dim)
         } else {
-            await terminal.writeLine("═══ Conversations ═══".cyan.bold)
+            let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
+            await terminal.writeLine("═══ Conversations ═══ \(networkLabel)".cyan.bold)
             await terminal.writeLine("")
+
+            // Build options for selection
+            var options: [String] = []
             for conv in conversations {
                 let shortAddr = String(conv.participant.description.prefix(12)) + "..."
-                await terminal.writeLine("📱 \(shortAddr.cyan)")
                 if let last = conv.lastMessage {
+                    let time = formatRelativeTime(last.timestamp)
                     let who = last.direction == .sent ? "You" : "Them"
-                    let preview = String(last.content.prefix(40))
-                    await terminal.writeLine("   \(who.dim): \(preview)")
+                    let preview = String(last.content.prefix(30))
+                    options.append("📱 \(shortAddr) (\(conv.messages.count) msgs) - \(who): \(preview)... [\(time)]")
+                } else {
+                    options.append("📱 \(shortAddr) (\(conv.messages.count) msgs)")
                 }
-                await terminal.writeLine("   Messages: \(conv.messages.count)".dim)
-                await terminal.writeLine("")
+            }
+            options.append("Back")
+
+            let selection = try await terminal.select(
+                "Select a conversation",
+                options: options
+            )
+
+            if selection == "Back" {
+                return
+            }
+
+            // Find the selected conversation
+            if let index = options.firstIndex(of: selection), index < conversations.count {
+                let conv = conversations[index]
+                try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)
             }
         }
     }
@@ -460,13 +685,130 @@ struct AlgoChatDemo {
         }
     }
 
+    // MARK: - Localnet Funding
+
+    /// Discovers a funded address from the localnet KMD wallet
+    static func discoverFundingAddress() throws -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/docker")
+        task.arguments = [
+            "exec", "algokit_sandbox_algod",
+            "goal", "account", "list",
+            "-d", "/algod/data"
+        ]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+
+        try task.run()
+        task.waitUntilExit()
+
+        guard task.terminationStatus == 0 else {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw FundingError.failed("Docker/localnet error: \(output)")
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+
+        // Parse the output to find the first account address
+        // Format: [online]	ADDRESS	ADDRESS	BALANCE microAlgos
+        let lines = output.components(separatedBy: "\n")
+        for line in lines {
+            let components = line.components(separatedBy: "\t")
+            if components.count >= 2 {
+                let address = components[1].trimmingCharacters(in: .whitespaces)
+                if address.count == 58 { // Valid Algorand address length
+                    return address
+                }
+            }
+        }
+
+        throw FundingError.failed("No funded accounts found in localnet wallet")
+    }
+
+    /// Funds an account on localnet using goal CLI (10 ALGO)
+    static func fundAccount(address: Address, terminal: Terminal) async {
+        await terminal.writeLine("")
+
+        do {
+            let fundingAddress = try await terminal.withSpinner(
+                message: "Finding localnet dispenser",
+                style: .dots
+            ) {
+                try discoverFundingAddress()
+            }
+
+            try await terminal.withSpinner(
+                message: "Sending 10 ALGO",
+                style: .dots
+            ) {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/docker")
+                task.arguments = [
+                    "exec", "algokit_sandbox_algod",
+                    "goal", "clerk", "send",
+                    "-a", "10000000",  // 10 ALGO in microAlgos
+                    "-f", fundingAddress,
+                    "-t", address.description,
+                    "-d", "/algod/data"
+                ]
+
+                let pipe = Pipe()
+                task.standardOutput = pipe
+                task.standardError = pipe
+
+                try task.run()
+                task.waitUntilExit()
+
+                guard task.terminationStatus == 0 else {
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let output = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    throw FundingError.failed(output)
+                }
+            }
+
+            await terminal.writeLine("")
+            await terminal.writeLine("✅ Funded with 10 ALGO!".green.bold)
+            await terminal.writeLine("You can now send messages.".dim)
+        } catch FundingError.failed(let message) {
+            await terminal.writeLine("")
+            await terminal.writeLine("❌ Funding failed".red.bold)
+            await terminal.writeLine("Make sure localnet is running: ".dim + "algokit localnet start".yellow)
+            await terminal.writeLine("Error: \(message)".dim)
+        } catch {
+            await terminal.writeLine("")
+            await terminal.writeLine("❌ Funding failed: \(error.localizedDescription)".red)
+        }
+    }
+
     // MARK: - Helpers
 
-    static func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+    static func formatRelativeTime(_ date: Date) -> String {
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+
+        switch interval {
+        case ..<60:
+            return "just now"
+        case ..<3600:
+            let mins = Int(interval / 60)
+            return "\(mins)m ago"
+        case ..<86400:
+            let hours = Int(interval / 3600)
+            return "\(hours)h ago"
+        case ..<172800:
+            return "yesterday"
+        case ..<604800:
+            let days = Int(interval / 86400)
+            return "\(days)d ago"
+        default:
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            return formatter.string(from: date)
+        }
     }
 }
 
@@ -474,4 +816,8 @@ extension Data {
     var hexString: String {
         map { String(format: "%02x", $0) }.joined()
     }
+}
+
+enum FundingError: Error {
+    case failed(String)
 }
