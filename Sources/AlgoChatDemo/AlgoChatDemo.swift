@@ -371,7 +371,7 @@ struct AlgoChatDemo {
                 message: "Encrypting and sending message",
                 style: .dots
             ) {
-                try await chat.sendAndWait(message: message, to: recipient)
+                try await chat.send(message, to: recipient, options: .confirmed)
             }
 
             await terminal.writeLine("")
@@ -414,21 +414,20 @@ struct AlgoChatDemo {
     }
 
     static func viewConversation(chat: AlgoChat, participant: Address, terminal: Terminal) async throws {
-        var allMessages: [Message] = []
-
-        // Initial load
-        let messages = try await terminal.withSpinner(
+        // Initial load using conversation-first API
+        var conversation = try await terminal.withSpinner(
             message: "Fetching messages",
             style: .dots
         ) {
-            try await chat.fetchMessages(with: participant)
+            var conv = try await chat.conversation(with: participant)
+            conv = try await chat.refresh(conv)
+            return conv
         }
-        allMessages = messages
 
         while true {
             await terminal.writeLine("")
 
-            if allMessages.isEmpty {
+            if conversation.isEmpty {
                 await terminal.writeLine("No messages yet.".yellow)
             } else {
                 let shortAddr = String(participant.description.prefix(12)) + "..."
@@ -437,14 +436,14 @@ struct AlgoChatDemo {
                 await terminal.writeLine("")
 
                 // Display messages with improved formatting
-                for msg in allMessages {
+                for msg in conversation.messages {
                     let time = formatRelativeTime(msg.timestamp)
 
                     if msg.direction == .sent {
                         // Sent message - right-aligned style
                         await terminal.writeLine("                              \(time.dim)")
                         // Show reply indicator BEFORE the message if this is a reply
-                        if let preview = msg.replyToPreview {
+                        if let preview = msg.replyContext?.preview {
                             let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
                             await terminal.writeLine("                    " + "↳ \"\(truncated)\"".dim)
                         }
@@ -453,7 +452,7 @@ struct AlgoChatDemo {
                         // Received message - left-aligned style
                         await terminal.writeLine("\(time.dim)")
                         // Show reply indicator BEFORE the message if this is a reply
-                        if let preview = msg.replyToPreview {
+                        if let preview = msg.replyContext?.preview {
                             let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
                             await terminal.writeLine("↳ \"\(truncated)\"".dim)
                         }
@@ -464,11 +463,10 @@ struct AlgoChatDemo {
                 }
             }
 
-            // Show action menu
-            let lastReceived = allMessages.last { $0.direction == .received }
+            // Show action menu - use conversation.lastReceived for easy reply
             var options = ["Send new message"]
 
-            if lastReceived != nil {
+            if conversation.lastReceived != nil {
                 options.insert("Reply to last message", at: 0)
             }
 
@@ -481,21 +479,22 @@ struct AlgoChatDemo {
 
             switch action {
             case "Reply to last message":
-                if let original = lastReceived {
-                    try await sendReply(chat: chat, to: participant, replyingTo: original, terminal: terminal)
-                    // Refresh messages after sending
-                    allMessages = try await chat.fetchMessages(with: participant)
+                if let original = conversation.lastReceived {
+                    try await sendReply(chat: chat, conversation: conversation, replyingTo: original, terminal: terminal)
+                    // Refresh conversation after sending
+                    conversation = try await chat.refresh(conversation)
                 }
             case "Send new message":
-                try await sendMessageTo(chat: chat, recipient: participant, terminal: terminal)
-                // Refresh messages after sending
-                allMessages = try await chat.fetchMessages(with: participant)
+                try await sendMessageTo(chat: chat, conversation: conversation, terminal: terminal)
+                // Refresh conversation after sending
+                conversation = try await chat.refresh(conversation)
             case "Refresh":
-                allMessages = try await terminal.withSpinner(
+                let currentConv = conversation
+                conversation = try await terminal.withSpinner(
                     message: "Refreshing",
                     style: .dots
                 ) {
-                    try await chat.fetchMessages(with: participant)
+                    try await chat.refresh(currentConv)
                 }
             case "Back":
                 return
@@ -505,7 +504,7 @@ struct AlgoChatDemo {
         }
     }
 
-    static func sendMessageTo(chat: AlgoChat, recipient: Address, terminal: Terminal) async throws {
+    static func sendMessageTo(chat: AlgoChat, conversation: Conversation, terminal: Terminal) async throws {
         let message = try await terminal.input("Your message")
 
         if message.isEmpty {
@@ -518,7 +517,7 @@ struct AlgoChatDemo {
                 message: "Sending",
                 style: .dots
             ) {
-                try await chat.sendAndWait(message: message, to: recipient)
+                try await chat.send(message, to: conversation, options: .confirmed)
             }
 
             await terminal.writeLine("✅ Sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
@@ -532,7 +531,7 @@ struct AlgoChatDemo {
 
     static func sendReply(
         chat: AlgoChat,
-        to recipient: Address,
+        conversation: Conversation,
         replyingTo original: Message,
         terminal: Terminal
     ) async throws {
@@ -554,7 +553,7 @@ struct AlgoChatDemo {
                 message: "Sending reply",
                 style: .dots
             ) {
-                try await chat.sendReplyAndWait(message: reply, to: recipient, replyingTo: original)
+                try await chat.send(reply, to: conversation, options: .replying(to: original, confirmed: true))
             }
 
             await terminal.writeLine("✅ Reply sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
@@ -593,15 +592,15 @@ struct AlgoChatDemo {
     }
 
     static func viewConversations(chat: AlgoChat, terminal: Terminal) async throws {
-        let conversations = try await terminal.withSpinner(
+        let allConversations = try await terminal.withSpinner(
             message: "Fetching conversations",
             style: .dots
         ) {
-            try await chat.fetchConversations()
+            try await chat.conversations()
         }
 
         await terminal.writeLine("")
-        if conversations.isEmpty {
+        if allConversations.isEmpty {
             await terminal.writeLine("No conversations yet.".yellow)
             await terminal.writeLine("Send a message to start chatting!".dim)
         } else {
@@ -611,15 +610,15 @@ struct AlgoChatDemo {
 
             // Build options for selection
             var options: [String] = []
-            for conv in conversations {
+            for conv in allConversations {
                 let shortAddr = String(conv.participant.description.prefix(12)) + "..."
                 if let last = conv.lastMessage {
                     let time = formatRelativeTime(last.timestamp)
                     let who = last.direction == .sent ? "You" : "Them"
                     let preview = String(last.content.prefix(30))
-                    options.append("📱 \(shortAddr) (\(conv.messages.count) msgs) - \(who): \(preview)... [\(time)]")
+                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs) - \(who): \(preview)... [\(time)]")
                 } else {
-                    options.append("📱 \(shortAddr) (\(conv.messages.count) msgs)")
+                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs)")
                 }
             }
             options.append("Back")
@@ -634,8 +633,8 @@ struct AlgoChatDemo {
             }
 
             // Find the selected conversation
-            if let index = options.firstIndex(of: selection), index < conversations.count {
-                let conv = conversations[index]
+            if let index = options.firstIndex(of: selection), index < allConversations.count {
+                let conv = allConversations[index]
                 try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)
             }
         }

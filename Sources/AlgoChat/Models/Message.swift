@@ -1,6 +1,28 @@
 import Algorand
 import Foundation
 
+/// Context for a reply message, linking it to the original
+public struct ReplyContext: Sendable, Codable, Equatable, Hashable {
+    /// Transaction ID of the original message
+    public let messageId: String
+
+    /// Preview of the original message (truncated)
+    public let preview: String
+
+    public init(messageId: String, preview: String) {
+        self.messageId = messageId
+        self.preview = preview
+    }
+
+    /// Creates a ReplyContext from a Message
+    public init(replyingTo message: Message, maxLength: Int = 80) {
+        self.messageId = message.id
+        self.preview = message.content.count > maxLength
+            ? String(message.content.prefix(maxLength - 3)) + "..."
+            : message.content
+    }
+}
+
 /// A chat message between Algorand addresses
 public struct Message: Sendable, Identifiable, Codable {
     /// Unique identifier (transaction ID)
@@ -30,11 +52,8 @@ public struct Message: Sendable, Identifiable, Codable {
     /// Message direction
     public let direction: Direction
 
-    /// Transaction ID this message replies to (nil if not a reply)
-    public let replyToId: String?
-
-    /// Preview of the original message being replied to
-    public let replyToPreview: String?
+    /// Reply context if this message is a reply
+    public let replyContext: ReplyContext?
 
     public init(
         id: String,
@@ -44,8 +63,7 @@ public struct Message: Sendable, Identifiable, Codable {
         timestamp: Date,
         confirmedRound: UInt64,
         direction: Direction,
-        replyToId: String? = nil,
-        replyToPreview: String? = nil
+        replyContext: ReplyContext? = nil
     ) {
         self.id = id
         self.sender = sender
@@ -54,13 +72,26 @@ public struct Message: Sendable, Identifiable, Codable {
         self.timestamp = timestamp
         self.confirmedRound = confirmedRound
         self.direction = direction
-        self.replyToId = replyToId
-        self.replyToPreview = replyToPreview
+        self.replyContext = replyContext
     }
 
     /// Whether this message is a reply to another message
     public var isReply: Bool {
-        replyToId != nil
+        replyContext != nil
+    }
+
+    // MARK: - Deprecated
+
+    /// Transaction ID this message replies to (nil if not a reply)
+    @available(*, deprecated, message: "Use replyContext?.messageId instead")
+    public var replyToId: String? {
+        replyContext?.messageId
+    }
+
+    /// Preview of the original message being replied to
+    @available(*, deprecated, message: "Use replyContext?.preview instead")
+    public var replyToPreview: String? {
+        replyContext?.preview
     }
 }
 

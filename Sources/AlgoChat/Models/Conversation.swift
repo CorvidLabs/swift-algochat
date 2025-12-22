@@ -16,11 +16,39 @@ public struct Conversation: Sendable, Identifiable {
     /// Messages in chronological order
     public private(set) var messages: [Message]
 
-    /// The most recent message
-    public var lastMessage: Message? { messages.last }
-
     /// The round of the last fetched message (for pagination)
     public var lastFetchedRound: UInt64?
+
+    // MARK: - Message Access
+
+    /// The most recent message in the conversation
+    public var lastMessage: Message? { messages.last }
+
+    /// The most recent received message (for replying)
+    public var lastReceived: Message? {
+        messages.last { $0.direction == .received }
+    }
+
+    /// The most recent sent message
+    public var lastSent: Message? {
+        messages.last { $0.direction == .sent }
+    }
+
+    /// All received messages
+    public var receivedMessages: [Message] {
+        messages.filter { $0.direction == .received }
+    }
+
+    /// All sent messages
+    public var sentMessages: [Message] {
+        messages.filter { $0.direction == .sent }
+    }
+
+    /// Number of messages in the conversation
+    public var messageCount: Int { messages.count }
+
+    /// Whether the conversation has any messages
+    public var isEmpty: Bool { messages.isEmpty }
 
     public init(
         participant: Address,

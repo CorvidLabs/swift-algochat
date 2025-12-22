@@ -206,26 +206,14 @@ struct LocalnetIntegrationTests {
         #expect(aliceBalance.value >= 1_000_000, "Alice should have at least 1 ALGO")
         #expect(bobBalance.value >= 1_000_000, "Bob should have at least 1 ALGO")
 
-        // Get the encryption public keys from each chat account
-        let alicePubKey = await aliceChat.account.encryptionPublicKey
-        let bobPubKey = await bobChat.account.encryptionPublicKey
-
-        // Step 1: Alice sends a message to herself to publish her public key
-        print("\n📤 Step 1: Alice publishes her public key (sends message to self)...")
-        let alicePubKeyTx = try await aliceChat.sendAndWait(
-            message: "Hello from Alice! Publishing my public key.",
-            to: aliceAccount.address,
-            recipientPublicKey: alicePubKey  // Use her own key since she's sending to herself
-        )
+        // Step 1: Alice publishes her encryption key
+        print("\n📤 Step 1: Alice publishes her public key...")
+        let alicePubKeyTx = try await aliceChat.publishKeyAndWait()
         print("   ✅ Alice's key published. TX: \(alicePubKeyTx.prefix(12))...")
 
-        // Step 2: Bob sends a message to himself to publish his public key
-        print("\n📤 Step 2: Bob publishes his public key (sends message to self)...")
-        let bobPubKeyTx = try await bobChat.sendAndWait(
-            message: "Hello from Bob! Publishing my public key.",
-            to: bobAccount.address,
-            recipientPublicKey: bobPubKey  // Use his own key since he's sending to himself
-        )
+        // Step 2: Bob publishes his encryption key
+        print("\n📤 Step 2: Bob publishes his public key...")
+        let bobPubKeyTx = try await bobChat.publishKeyAndWait()
         print("   ✅ Bob's key published. TX: \(bobPubKeyTx.prefix(12))...")
 
         // Wait for indexer to catch up - poll until we see the key publication transactions
@@ -236,22 +224,24 @@ struct LocalnetIntegrationTests {
         print("   Waiting for Bob's key...")
         try await waitForTransaction(from: bobAccount.address, algokit: algokit)
 
-        // Step 3: Alice sends a message to Bob
+        // Step 3: Alice sends a message to Bob (using new conversation-first API)
         print("\n📤 Step 3: Alice sends message to Bob...")
         let message1 = "Hey Bob! This is Alice. Can you hear me? 🎉"
-        let tx1 = try await aliceChat.sendAndWait(message: message1, to: bobAccount.address)
+        let aliceToBobConv = try await aliceChat.conversation(with: bobAccount.address)
+        let tx1 = try await aliceChat.send(message1, to: aliceToBobConv, options: .confirmed)
         print("   ✅ Message sent. TX: \(tx1.prefix(12))...")
 
         // Step 4: Bob sends a message to Alice
         print("\n📤 Step 4: Bob sends message to Alice...")
         let message2 = "Hi Alice! Yes I can! This is amazing! 🚀"
-        let tx2 = try await bobChat.sendAndWait(message: message2, to: aliceAccount.address)
+        let bobToAliceConv = try await bobChat.conversation(with: aliceAccount.address)
+        let tx2 = try await bobChat.send(message2, to: bobToAliceConv, options: .confirmed)
         print("   ✅ Message sent. TX: \(tx2.prefix(12))...")
 
         // Step 5: Alice sends another message to Bob
         print("\n📤 Step 5: Alice sends another message to Bob...")
         let message3 = "Encrypted blockchain messaging works! 💎"
-        let tx3 = try await aliceChat.sendAndWait(message: message3, to: bobAccount.address)
+        let tx3 = try await aliceChat.send(message3, to: aliceToBobConv, options: .confirmed)
         print("   ✅ Message sent. TX: \(tx3.prefix(12))...")
 
         // Wait for indexer to catch up - poll until we see all messages
@@ -263,46 +253,48 @@ struct LocalnetIntegrationTests {
         print("   Waiting for Alice's messages (expecting 4)...")
         try await waitForChatMessages(for: aliceAccount.address, count: 4, algokit: algokit)
 
-        // Step 6: Bob fetches messages from Alice
+        // Step 6: Bob fetches messages from Alice (using refresh)
         print("\n📥 Step 6: Bob fetches messages from Alice...")
-        let bobMessages = try await bobChat.fetchMessages(with: aliceAccount.address)
-        print("   ✅ Bob received \(bobMessages.count) messages from Alice:")
-        for msg in bobMessages {
+        var bobConv = try await bobChat.conversation(with: aliceAccount.address)
+        bobConv = try await bobChat.refresh(bobConv)
+        print("   ✅ Bob received \(bobConv.messageCount) messages from Alice:")
+        for msg in bobConv.messages {
             let direction = msg.direction == .sent ? "→" : "←"
             print("      \(direction) \(msg.content)")
         }
 
-        // Verify Bob received Alice's messages
-        let receivedByBob = bobMessages.filter { $0.direction == .received }.map { $0.content }
+        // Verify Bob received Alice's messages (using new convenience properties)
+        let receivedByBob = bobConv.receivedMessages.map { $0.content }
         #expect(receivedByBob.contains(message1), "Bob should have received message 1")
         #expect(receivedByBob.contains(message3), "Bob should have received message 3")
 
         // Step 7: Alice fetches messages from Bob
         print("\n📥 Step 7: Alice fetches messages from Bob...")
-        let aliceMessages = try await aliceChat.fetchMessages(with: bobAccount.address)
-        print("   ✅ Alice received \(aliceMessages.count) messages with Bob:")
-        for msg in aliceMessages {
+        var aliceConv = try await aliceChat.conversation(with: bobAccount.address)
+        aliceConv = try await aliceChat.refresh(aliceConv)
+        print("   ✅ Alice received \(aliceConv.messageCount) messages with Bob:")
+        for msg in aliceConv.messages {
             let direction = msg.direction == .sent ? "→" : "←"
             print("      \(direction) \(msg.content)")
         }
 
         // Verify Alice received Bob's message
-        let receivedByAlice = aliceMessages.filter { $0.direction == .received }.map { $0.content }
+        let receivedByAlice = aliceConv.receivedMessages.map { $0.content }
         #expect(receivedByAlice.contains(message2), "Alice should have received message 2")
 
-        // Step 8: Check conversations
+        // Step 8: Check conversations (using new conversations() method)
         print("\n📋 Step 8: Checking conversations...")
-        let aliceConversations = try await aliceChat.fetchConversations()
-        let bobConversations = try await bobChat.fetchConversations()
+        let aliceConversations = try await aliceChat.conversations()
+        let bobConversations = try await bobChat.conversations()
 
         print("   Alice's conversations: \(aliceConversations.count)")
         for conv in aliceConversations {
-            print("      - \(conv.participant.description.prefix(12))... (\(conv.messages.count) messages)")
+            print("      - \(conv.participant.description.prefix(12))... (\(conv.messageCount) messages)")
         }
 
         print("   Bob's conversations: \(bobConversations.count)")
         for conv in bobConversations {
-            print("      - \(conv.participant.description.prefix(12))... (\(conv.messages.count) messages)")
+            print("      - \(conv.participant.description.prefix(12))... (\(conv.messageCount) messages)")
         }
 
         // Final summary
@@ -344,32 +336,33 @@ struct LocalnetIntegrationTests {
         let bobChat = try await AlgoChat(configuration: .localnet(), account: bob)
         let eveChat = try await AlgoChat(configuration: .localnet(), account: eve)
 
-        // Publish keys (send to self using own public key)
-        let alicePubKey = await aliceChat.account.encryptionPublicKey
-        let bobPubKey = await bobChat.account.encryptionPublicKey
-        _ = try await aliceChat.sendAndWait(message: "key", to: alice.address, recipientPublicKey: alicePubKey)
-        _ = try await bobChat.sendAndWait(message: "key", to: bob.address, recipientPublicKey: bobPubKey)
+        // Publish keys using the new API
+        _ = try await aliceChat.publishKeyAndWait()
+        _ = try await bobChat.publishKeyAndWait()
 
         // Wait for indexer to catch up
         let algokit = AlgoKit(configuration: .localnet())
         try await waitForTransaction(from: alice.address, algokit: algokit)
         try await waitForTransaction(from: bob.address, algokit: algokit)
 
-        // Alice sends secret to Bob
+        // Alice sends secret to Bob using new conversation-first API
         let secretMessage = "This is a secret message only for Bob!"
-        _ = try await aliceChat.sendAndWait(message: secretMessage, to: bob.address)
+        let aliceToBob = try await aliceChat.conversation(with: bob.address)
+        _ = try await aliceChat.send(secretMessage, to: aliceToBob, options: .confirmed)
 
         // Wait for indexer to catch up (Bob should have 2 messages: key + secret)
         try await waitForChatMessages(for: bob.address, count: 2, algokit: algokit)
 
-        // Bob can read the message
-        let bobMessages = try await bobChat.fetchMessages(with: alice.address)
-        let bobReceived = bobMessages.filter { $0.direction == .received }
-        #expect(bobReceived.contains { $0.content == secretMessage }, "Bob should decrypt the message")
+        // Bob can read the message using new API
+        var bobConv = try await bobChat.conversation(with: alice.address)
+        bobConv = try await bobChat.refresh(bobConv)
+        #expect(bobConv.receivedMessages.contains { $0.content == secretMessage }, "Bob should decrypt the message")
 
         // Eve cannot read messages between Alice and Bob (she has no messages with them)
-        let eveFromAlice = try await eveChat.fetchMessages(with: alice.address)
-        let eveFromBob = try await eveChat.fetchMessages(with: bob.address)
+        var eveFromAlice = try await eveChat.conversation(with: alice.address)
+        eveFromAlice = try await eveChat.refresh(eveFromAlice)
+        var eveFromBob = try await eveChat.conversation(with: bob.address)
+        eveFromBob = try await eveChat.refresh(eveFromBob)
 
         #expect(eveFromAlice.isEmpty, "Eve should have no messages with Alice")
         #expect(eveFromBob.isEmpty, "Eve should have no messages with Bob")

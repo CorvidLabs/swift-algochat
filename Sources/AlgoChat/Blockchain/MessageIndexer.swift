@@ -190,6 +190,14 @@ public actor MessageIndexer {
             timestamp = Date()
         }
 
+        // Build reply context if this is a reply
+        let replyContext: ReplyContext?
+        if let replyId = decrypted.replyToId, let preview = decrypted.replyToPreview {
+            replyContext = ReplyContext(messageId: replyId, preview: preview)
+        } else {
+            replyContext = nil
+        }
+
         return Message(
             id: tx.id,
             sender: sender,
@@ -198,8 +206,7 @@ public actor MessageIndexer {
             timestamp: timestamp,
             confirmedRound: tx.confirmedRound ?? 0,
             direction: direction,
-            replyToId: decrypted.replyToId,
-            replyToPreview: decrypted.replyToPreview
+            replyContext: replyContext
         )
     }
 }

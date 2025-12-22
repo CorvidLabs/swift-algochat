@@ -81,38 +81,131 @@ public actor AlgoChat {
         )
     }
 
+    // MARK: - Conversations
+
+    /// Gets or creates a conversation with a participant
+    ///
+    /// This is the primary entry point for messaging. The returned conversation
+    /// can be used with `send(_:to:options:)` to send messages.
+    ///
+    /// - Parameter participant: The other party's Algorand address
+    /// - Returns: A conversation object (may be empty if no history exists)
+    public func conversation(with participant: Address) async throws -> Conversation {
+        var conv = Conversation(participant: participant)
+
+        // Try to get the participant's encryption key
+        if participant == account.address {
+            conv.participantEncryptionKey = account.encryptionPublicKey
+        } else if let pubKey = try? await fetchPublicKey(for: participant) {
+            conv.participantEncryptionKey = pubKey
+        }
+
+        return conv
+    }
+
+    /// Fetches all conversations for the current account
+    ///
+    /// - Parameter limit: Maximum number of transactions to scan
+    /// - Returns: Array of conversations, sorted by most recent message
+    public func conversations(limit: Int = 100) async throws -> [Conversation] {
+        try await indexer.fetchConversations(limit: limit)
+    }
+
+    /// Refreshes a conversation with the latest messages from the blockchain
+    ///
+    /// - Parameters:
+    ///   - conversation: The conversation to refresh
+    ///   - limit: Maximum number of messages to fetch
+    /// - Returns: Updated conversation with new messages merged in
+    public func refresh(
+        _ conversation: Conversation,
+        limit: Int = 50
+    ) async throws -> Conversation {
+        var updated = conversation
+
+        let messages = try await indexer.fetchMessages(
+            with: conversation.participant,
+            afterRound: conversation.lastFetchedRound,
+            limit: limit
+        )
+
+        updated.merge(messages)
+
+        if let lastRound = messages.map({ $0.confirmedRound }).max() {
+            updated.lastFetchedRound = lastRound
+        }
+
+        // Update public key if we found it from received messages
+        if updated.participantEncryptionKey == nil,
+           messages.contains(where: { $0.direction == .received }) {
+            updated.participantEncryptionKey = try? await fetchPublicKey(for: conversation.participant)
+        }
+
+        return updated
+    }
+
     // MARK: - Sending Messages
 
-    /// Sends an encrypted message to a recipient
+    /// Sends a message to a conversation
+    ///
+    /// This is the primary send method. Use `SendOptions` to configure
+    /// confirmation waiting and reply context.
     ///
     /// - Parameters:
     ///   - message: The plaintext message (max ~962 bytes when UTF-8 encoded)
-    ///   - recipient: The recipient's Algorand address
-    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
+    ///   - conversation: The conversation to send to
+    ///   - options: Send options (default: fire-and-forget)
     /// - Returns: The transaction ID
-    /// - Throws: `ChatError.messageTooLarge` if message exceeds size limit
+    ///
+    /// Example usage:
+    /// ```swift
+    /// // Simple send
+    /// let txid = try await chat.send("Hello!", to: conversation)
+    ///
+    /// // Send and wait for confirmation
+    /// let txid = try await chat.send("Hello!", to: conversation, options: .confirmed)
+    ///
+    /// // Send a reply
+    /// if let lastMsg = conversation.lastReceived {
+    ///     let txid = try await chat.send(
+    ///         "Thanks!",
+    ///         to: conversation,
+    ///         options: .replying(to: lastMsg, confirmed: true)
+    ///     )
+    /// }
+    /// ```
+    @discardableResult
     public func send(
-        message: String,
-        to recipient: Address,
-        recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil
+        _ message: String,
+        to conversation: Conversation,
+        options: SendOptions = .default
     ) async throws -> String {
         // Get recipient's encryption public key
         let pubKey: Curve25519.KeyAgreement.PublicKey
-        if let provided = recipientPublicKey {
-            pubKey = provided
-        } else if recipient == account.address {
-            // Self-messaging: use our own local key instead of fetching from indexer
+        if let cached = conversation.participantEncryptionKey {
+            pubKey = cached
+        } else if conversation.participant == account.address {
             pubKey = account.encryptionPublicKey
         } else {
-            pubKey = try await fetchPublicKey(for: recipient)
+            pubKey = try await fetchPublicKey(for: conversation.participant)
         }
 
         // Encrypt the message
-        let envelope = try MessageEncryptor.encrypt(
-            message: message,
-            senderPrivateKey: account.encryptionPrivateKey,
-            recipientPublicKey: pubKey
-        )
+        let envelope: ChatEnvelope
+        if let replyContext = options.replyContext {
+            envelope = try MessageEncryptor.encrypt(
+                message: message,
+                replyTo: (txid: replyContext.messageId, preview: replyContext.preview),
+                senderPrivateKey: account.encryptionPrivateKey,
+                recipientPublicKey: pubKey
+            )
+        } else {
+            envelope = try MessageEncryptor.encrypt(
+                message: message,
+                senderPrivateKey: account.encryptionPrivateKey,
+                recipientPublicKey: pubKey
+            )
+        }
 
         // Get transaction parameters
         let params = try await algokit.algodClient.transactionParams()
@@ -120,99 +213,82 @@ public actor AlgoChat {
         // Create and sign the transaction
         let signedTx = try MessageTransaction.createSigned(
             from: account,
-            to: recipient,
+            to: conversation.participant,
             envelope: envelope,
             params: params
         )
 
         // Submit transaction
-        return try await algokit.algodClient.sendTransaction(signedTx)
+        let txid = try await algokit.algodClient.sendTransaction(signedTx)
+
+        // Wait for confirmation if requested
+        if options.waitForConfirmation {
+            _ = try await algokit.algodClient.waitForConfirmation(
+                transactionID: txid,
+                timeout: options.timeout
+            )
+        }
+
+        return txid
     }
 
-    /// Sends a message and waits for confirmation
+    /// Sends a message to an address (convenience for one-off messages)
     ///
-    /// - Parameters:
-    ///   - message: The plaintext message
-    ///   - recipient: The recipient's Algorand address
-    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
-    ///   - timeout: Maximum rounds to wait (default: 10)
-    /// - Returns: The transaction ID
+    /// For persistent messaging, use `conversation(with:)` and `send(_:to:options:)`.
+    @discardableResult
+    public func send(
+        _ message: String,
+        to recipient: Address,
+        options: SendOptions = .default
+    ) async throws -> String {
+        let conv = try await conversation(with: recipient)
+        return try await send(message, to: conv, options: options)
+    }
+
+    // MARK: - Deprecated API
+
+    @available(*, deprecated, message: "Use send(_:to:options:) with a Conversation instead")
+    public func send(
+        message: String,
+        to recipient: Address,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil
+    ) async throws -> String {
+        var conv = try await conversation(with: recipient)
+        if let key = recipientPublicKey {
+            conv.participantEncryptionKey = key
+        }
+        return try await send(message, to: conv)
+    }
+
+    @available(*, deprecated, message: "Use send(_:to:options: .confirmed) instead")
     public func sendAndWait(
         message: String,
         to recipient: Address,
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil,
         timeout: UInt64 = 10
     ) async throws -> String {
-        let txid = try await send(message: message, to: recipient, recipientPublicKey: recipientPublicKey)
-        _ = try await algokit.algodClient.waitForConfirmation(
-            transactionID: txid,
-            timeout: timeout
-        )
-        return txid
+        var conv = try await conversation(with: recipient)
+        if let key = recipientPublicKey {
+            conv.participantEncryptionKey = key
+        }
+        return try await send(message, to: conv, options: SendOptions(waitForConfirmation: true, timeout: timeout))
     }
 
-    // MARK: - Replying to Messages
-
-    /// Sends an encrypted reply to a previous message
-    ///
-    /// The reply includes metadata linking it to the original message, and the
-    /// content includes a quoted preview of the original for display in clients
-    /// that don't support threading.
-    ///
-    /// - Parameters:
-    ///   - message: The reply text
-    ///   - recipient: The recipient's Algorand address
-    ///   - original: The message being replied to
-    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
-    /// - Returns: The transaction ID
+    @available(*, deprecated, message: "Use send(_:to:options: .replying(to:)) instead")
     public func sendReply(
         message: String,
         to recipient: Address,
         replyingTo original: Message,
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil
     ) async throws -> String {
-        // Get recipient's encryption public key
-        let pubKey: Curve25519.KeyAgreement.PublicKey
-        if let provided = recipientPublicKey {
-            pubKey = provided
-        } else if recipient == account.address {
-            pubKey = account.encryptionPublicKey
-        } else {
-            pubKey = try await fetchPublicKey(for: recipient)
+        var conv = try await conversation(with: recipient)
+        if let key = recipientPublicKey {
+            conv.participantEncryptionKey = key
         }
-
-        // Encrypt the reply with metadata
-        let envelope = try MessageEncryptor.encrypt(
-            message: message,
-            replyTo: (txid: original.id, preview: original.content),
-            senderPrivateKey: account.encryptionPrivateKey,
-            recipientPublicKey: pubKey
-        )
-
-        // Get transaction parameters
-        let params = try await algokit.algodClient.transactionParams()
-
-        // Create and sign the transaction
-        let signedTx = try MessageTransaction.createSigned(
-            from: account,
-            to: recipient,
-            envelope: envelope,
-            params: params
-        )
-
-        // Submit transaction
-        return try await algokit.algodClient.sendTransaction(signedTx)
+        return try await send(message, to: conv, options: .replying(to: original))
     }
 
-    /// Sends a reply and waits for confirmation
-    ///
-    /// - Parameters:
-    ///   - message: The reply text
-    ///   - recipient: The recipient's Algorand address
-    ///   - original: The message being replied to
-    ///   - recipientPublicKey: Optional cached public key (will be fetched if not provided)
-    ///   - timeout: Maximum rounds to wait (default: 10)
-    /// - Returns: The transaction ID
+    @available(*, deprecated, message: "Use send(_:to:options: .replying(to:, confirmed: true)) instead")
     public func sendReplyAndWait(
         message: String,
         to recipient: Address,
@@ -220,28 +296,14 @@ public actor AlgoChat {
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil,
         timeout: UInt64 = 10
     ) async throws -> String {
-        let txid = try await sendReply(
-            message: message,
-            to: recipient,
-            replyingTo: original,
-            recipientPublicKey: recipientPublicKey
-        )
-        _ = try await algokit.algodClient.waitForConfirmation(
-            transactionID: txid,
-            timeout: timeout
-        )
-        return txid
+        var conv = try await conversation(with: recipient)
+        if let key = recipientPublicKey {
+            conv.participantEncryptionKey = key
+        }
+        return try await send(message, to: conv, options: .replying(to: original, confirmed: true, timeout: timeout))
     }
 
-    // MARK: - Fetching Messages
-
-    /// Fetches messages from a conversation
-    ///
-    /// - Parameters:
-    ///   - participant: The other party in the conversation
-    ///   - afterRound: Only fetch messages after this round (for pagination)
-    ///   - limit: Maximum number of messages to fetch
-    /// - Returns: Array of decrypted messages, sorted chronologically
+    @available(*, deprecated, message: "Use refresh(_:) on a Conversation instead")
     public func fetchMessages(
         with participant: Address,
         afterRound: UInt64? = nil,
@@ -254,12 +316,9 @@ public actor AlgoChat {
         )
     }
 
-    /// Fetches all conversations for the current account
-    ///
-    /// - Parameter limit: Maximum number of transactions to scan
-    /// - Returns: Array of conversations, sorted by most recent message
+    @available(*, deprecated, renamed: "conversations")
     public func fetchConversations(limit: Int = 100) async throws -> [Conversation] {
-        try await indexer.fetchConversations(limit: limit)
+        try await conversations(limit: limit)
     }
 
     // MARK: - Key Management
