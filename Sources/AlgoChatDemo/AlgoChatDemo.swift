@@ -6,11 +6,62 @@ import Foundation
 
 @main
 struct AlgoChatDemo {
-    // Shared key storage for biometric access
+    // MARK: - Constants
+
+    /// Maximum message size in bytes (transaction note limit minus envelope overhead)
+    static let maxMessageBytes = 962
+
+    /// Standard address display length
+    static let addressDisplayLength = 12
+
+    /// Standard preview display length
+    static let previewDisplayLength = 30
+
+    // MARK: - State
+
+    /// Shared key storage for biometric access
     static let keyStorage = KeychainKeyStorage()
 
-    // Selected network (set at startup)
+    /// Selected network (set at startup)
     nonisolated(unsafe) static var isLocalnet: Bool = true
+
+    /// Network display name
+    static var networkName: String {
+        isLocalnet ? "Localnet" : "TestNet"
+    }
+
+    // MARK: - Helper Functions
+
+    /// Truncates an address for display
+    static func truncateAddress(_ address: String, length: Int = addressDisplayLength) -> String {
+        if address.count <= length + 3 {
+            return address
+        }
+        return String(address.prefix(length)) + "..."
+    }
+
+    /// Truncates a message preview for display
+    static func truncatePreview(_ text: String, length: Int = previewDisplayLength) -> String {
+        if text.count <= length {
+            return text
+        }
+        return String(text.prefix(length - 3)) + "..."
+    }
+
+    /// Finds Docker executable path
+    static func findDockerPath() -> String? {
+        let paths = [
+            "/opt/homebrew/bin/docker",  // Apple Silicon Homebrew
+            "/usr/local/bin/docker",      // Intel Homebrew / standard
+            "/usr/bin/docker"             // System install
+        ]
+        for path in paths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
 
     static func main() async {
         let terminal = Terminal.shared
@@ -54,9 +105,8 @@ struct AlgoChatDemo {
         while true {
             if let account = currentAccount {
                 // Logged in menu
-                let shortAddr = String(account.address.description.prefix(8)) + "..."
-                let networkLabel = isLocalnet ? "Localnet" : "TestNet"
-                await terminal.writeLine("Logged in as: ".dim + shortAddr.green.bold + " on ".dim + networkLabel.cyan)
+                let shortAddr = truncateAddress(account.address.description)
+                await terminal.writeLine("Logged in as: ".dim + shortAddr.green.bold + " on ".dim + networkName.cyan)
                 await terminal.writeLine("")
 
                 var menuOptions = [
@@ -111,7 +161,7 @@ struct AlgoChatDemo {
 
                 // Add saved accounts first
                 for addr in savedAddresses.prefix(3) {
-                    let shortAddr = String(addr.description.prefix(8)) + "..."
+                    let shortAddr = truncateAddress(addr.description)
                     #if os(iOS) || os(macOS) || os(visionOS)
                     let biometric = KeychainKeyStorage.biometricType.rawValue
                     options.append("🔐 \(shortAddr) (\(biometric))")
@@ -305,6 +355,13 @@ struct AlgoChatDemo {
             return nil
         }
 
+        // Validate word count
+        let words = mnemonic.split(separator: " ").filter { !$0.isEmpty }
+        if words.count != 25 {
+            await terminal.writeLine("Invalid mnemonic: expected 25 words, got \(words.count).".red)
+            return nil
+        }
+
         do {
             let account = try await terminal.withSpinner(
                 message: "Loading account",
@@ -322,7 +379,6 @@ struct AlgoChatDemo {
     }
 
     static func initChat(account: ChatAccount, terminal: Terminal) async throws -> AlgoChat {
-        let networkName = isLocalnet ? "Localnet" : "TestNet"
         return try await terminal.withSpinner(
             message: "Connecting to Algorand \(networkName)",
             style: .dots
@@ -359,10 +415,17 @@ struct AlgoChatDemo {
             return
         }
 
-        let message = try await terminal.input("Your message")
+        let message = try await terminal.input("Your message (max \(maxMessageBytes) bytes)")
 
         if message.isEmpty {
             await terminal.writeLine("Cancelled.".yellow)
+            return
+        }
+
+        // Validate message size
+        let messageBytes = message.utf8.count
+        if messageBytes > maxMessageBytes {
+            await terminal.writeLine("Message too large: \(messageBytes) bytes (max \(maxMessageBytes)).".red)
             return
         }
 
@@ -430,7 +493,7 @@ struct AlgoChatDemo {
             if conversation.isEmpty {
                 await terminal.writeLine("No messages yet.".yellow)
             } else {
-                let shortAddr = String(participant.description.prefix(12)) + "..."
+                let shortAddr = truncateAddress(participant.description)
                 let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
                 await terminal.writeLine("═══ Conversation with \(shortAddr.cyan) ═══ \(networkLabel)".bold)
                 await terminal.writeLine("")
@@ -444,8 +507,7 @@ struct AlgoChatDemo {
                         await terminal.writeLine("                              \(time.dim)")
                         // Show reply indicator BEFORE the message if this is a reply
                         if let preview = msg.replyContext?.preview {
-                            let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
-                            await terminal.writeLine("                    " + "↳ \"\(truncated)\"".dim)
+                            await terminal.writeLine("                    " + "↳ \"\(truncatePreview(preview))\"".dim)
                         }
                         await terminal.writeLine("                    \(msg.content)".green + " [You]".dim)
                     } else {
@@ -453,8 +515,7 @@ struct AlgoChatDemo {
                         await terminal.writeLine("\(time.dim)")
                         // Show reply indicator BEFORE the message if this is a reply
                         if let preview = msg.replyContext?.preview {
-                            let truncated = preview.count > 30 ? String(preview.prefix(27)) + "..." : preview
-                            await terminal.writeLine("↳ \"\(truncated)\"".dim)
+                            await terminal.writeLine("↳ \"\(truncatePreview(preview))\"".dim)
                         }
                         await terminal.writeLine("[Them] ".dim + msg.content.blue)
                     }
@@ -505,10 +566,16 @@ struct AlgoChatDemo {
     }
 
     static func sendMessageTo(chat: AlgoChat, conversation: Conversation, terminal: Terminal) async throws {
-        let message = try await terminal.input("Your message")
+        let message = try await terminal.input("Your message (max \(maxMessageBytes) bytes)")
 
         if message.isEmpty {
             await terminal.writeLine("Cancelled.".yellow)
+            return
+        }
+
+        // Validate message size
+        if message.utf8.count > maxMessageBytes {
+            await terminal.writeLine("Message too large (max \(maxMessageBytes) bytes).".red)
             return
         }
 
@@ -536,15 +603,18 @@ struct AlgoChatDemo {
         terminal: Terminal
     ) async throws {
         await terminal.writeLine("")
-        let preview = original.content.count > 50
-            ? String(original.content.prefix(47)) + "..."
-            : original.content
-        await terminal.writeLine("Replying to: ".dim + "\"\(preview)\"".cyan)
+        await terminal.writeLine("Replying to: ".dim + "\"\(truncatePreview(original.content, length: 50))\"".cyan)
 
-        let reply = try await terminal.input("Your reply")
+        let reply = try await terminal.input("Your reply (max \(maxMessageBytes) bytes)")
 
         if reply.isEmpty {
             await terminal.writeLine("Cancelled.".yellow)
+            return
+        }
+
+        // Validate message size
+        if reply.utf8.count > maxMessageBytes {
+            await terminal.writeLine("Reply too large (max \(maxMessageBytes) bytes).".red)
             return
         }
 
@@ -611,12 +681,12 @@ struct AlgoChatDemo {
             // Build options for selection
             var options: [String] = []
             for conv in allConversations {
-                let shortAddr = String(conv.participant.description.prefix(12)) + "..."
+                let shortAddr = truncateAddress(conv.participant.description)
                 if let last = conv.lastMessage {
                     let time = formatRelativeTime(last.timestamp)
                     let who = last.direction == .sent ? "You" : "Them"
-                    let preview = String(last.content.prefix(30))
-                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs) - \(who): \(preview)... [\(time)]")
+                    let preview = truncatePreview(last.content)
+                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs) - \(who): \(preview) [\(time)]")
                 } else {
                     options.append("📱 \(shortAddr) (\(conv.messageCount) msgs)")
                 }
@@ -688,8 +758,12 @@ struct AlgoChatDemo {
 
     /// Discovers a funded address from the localnet KMD wallet
     static func discoverFundingAddress() throws -> String {
+        guard let dockerPath = findDockerPath() else {
+            throw FundingError.failed("Docker not found. Install Docker Desktop or ensure docker is in your PATH.")
+        }
+
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/docker")
+        task.executableURL = URL(fileURLWithPath: dockerPath)
         task.arguments = [
             "exec", "algokit_sandbox_algod",
             "goal", "account", "list",
@@ -740,12 +814,16 @@ struct AlgoChatDemo {
                 try discoverFundingAddress()
             }
 
+            guard let dockerPath = findDockerPath() else {
+                throw FundingError.failed("Docker not found")
+            }
+
             try await terminal.withSpinner(
                 message: "Sending 10 ALGO",
                 style: .dots
             ) {
                 let task = Process()
-                task.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/docker")
+                task.executableURL = URL(fileURLWithPath: dockerPath)
                 task.arguments = [
                     "exec", "algokit_sandbox_algod",
                     "goal", "clerk", "send",

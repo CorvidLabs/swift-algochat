@@ -79,20 +79,6 @@ public struct Message: Sendable, Identifiable, Codable {
     public var isReply: Bool {
         replyContext != nil
     }
-
-    // MARK: - Deprecated
-
-    /// Transaction ID this message replies to (nil if not a reply)
-    @available(*, deprecated, message: "Use replyContext?.messageId instead")
-    public var replyToId: String? {
-        replyContext?.messageId
-    }
-
-    /// Preview of the original message being replied to
-    @available(*, deprecated, message: "Use replyContext?.preview instead")
-    public var replyToPreview: String? {
-        replyContext?.preview
-    }
 }
 
 extension Message: Equatable {
