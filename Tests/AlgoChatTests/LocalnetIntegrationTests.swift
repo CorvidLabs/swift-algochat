@@ -228,21 +228,21 @@ struct LocalnetIntegrationTests {
         print("\n📤 Step 3: Alice sends message to Bob...")
         let message1 = "Hey Bob! This is Alice. Can you hear me? 🎉"
         let aliceToBobConv = try await aliceChat.conversation(with: bobAccount.address)
-        let tx1 = try await aliceChat.send(message1, to: aliceToBobConv, options: .confirmed)
-        print("   ✅ Message sent. TX: \(tx1.prefix(12))...")
+        let result1 = try await aliceChat.send(message1, to: aliceToBobConv, options: .confirmed)
+        print("   ✅ Message sent. TX: \(result1.txid.prefix(12))...")
 
         // Step 4: Bob sends a message to Alice
         print("\n📤 Step 4: Bob sends message to Alice...")
         let message2 = "Hi Alice! Yes I can! This is amazing! 🚀"
         let bobToAliceConv = try await bobChat.conversation(with: aliceAccount.address)
-        let tx2 = try await bobChat.send(message2, to: bobToAliceConv, options: .confirmed)
-        print("   ✅ Message sent. TX: \(tx2.prefix(12))...")
+        let result2 = try await bobChat.send(message2, to: bobToAliceConv, options: .confirmed)
+        print("   ✅ Message sent. TX: \(result2.txid.prefix(12))...")
 
         // Step 5: Alice sends another message to Bob
         print("\n📤 Step 5: Alice sends another message to Bob...")
         let message3 = "Encrypted blockchain messaging works! 💎"
-        let tx3 = try await aliceChat.send(message3, to: aliceToBobConv, options: .confirmed)
-        print("   ✅ Message sent. TX: \(tx3.prefix(12))...")
+        let result3 = try await aliceChat.send(message3, to: aliceToBobConv, options: .confirmed)
+        print("   ✅ Message sent. TX: \(result3.txid.prefix(12))...")
 
         // Wait for indexer to catch up - poll until we see all messages
         // Bob should have: 1 self-sent key + 2 from Alice = 3 chat messages
@@ -396,6 +396,96 @@ struct LocalnetIntegrationTests {
         print("Published key! TX: \(txid)")
 
         #expect(!txid.isEmpty, "Should get a transaction ID")
+    }
+
+    @Test("Self-messaging works correctly with indexer wait")
+    func testSelfMessaging() async throws {
+        guard isLocalnetRunning() else {
+            print("⚠️ Skipping test: localnet is not running")
+            return
+        }
+
+        print("\n" + String(repeating: "=", count: 60))
+        print("🧪 SELF-MESSAGING TEST")
+        print(String(repeating: "=", count: 60))
+
+        // Create and fund a single account
+        let account = try Account()
+        print("\n📝 Created test account:")
+        print("   Address: \(account.address)")
+
+        print("\n💰 Funding account...")
+        try fundAccount(account, amount: 10_000_000)
+        print("   ✅ Account funded with 10 ALGO")
+
+        try await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Create chat instance
+        print("\n🔌 Connecting to Algorand localnet...")
+        let chat = try await AlgoChat(configuration: .localnet(), account: account)
+        print("   ✅ Connected")
+
+        // Publish key
+        print("\n📤 Publishing encryption key...")
+        let keyTx = try await chat.publishKeyAndWait()
+        print("   ✅ Key published. TX: \(keyTx.prefix(12))...")
+
+        // Wait for indexer
+        let algokit = AlgoKit(configuration: .localnet())
+        print("\n⏳ Waiting for indexer...")
+        try await waitForTransaction(from: account.address, algokit: algokit)
+
+        // Send message to self using .indexed option
+        print("\n📤 Sending message to self...")
+        let selfMessage = "Hello, myself! Testing self-messaging with indexer wait. 🪞"
+        let selfConv = try await chat.conversation(with: account.address)
+        let result = try await chat.send(selfMessage, to: selfConv, options: .indexed)
+        print("   ✅ Message sent. TX: \(result.txid.prefix(12))...")
+
+        // Refresh the conversation - message should be visible immediately
+        print("\n📥 Refreshing conversation...")
+        var refreshedConv = try await chat.refresh(selfConv)
+        print("   Found \(refreshedConv.messageCount) messages")
+
+        // Verify message appears
+        let sentMessages = refreshedConv.sentMessages
+        #expect(sentMessages.contains { $0.content == selfMessage }, "Self-message should appear in sent messages")
+
+        // Verify it appears in conversations list
+        print("\n📋 Checking conversations list...")
+        let conversations = try await chat.conversations()
+        let selfConversation = conversations.first { $0.participant == account.address }
+        #expect(selfConversation != nil, "Self-conversation should appear in conversations list")
+        if let selfConv = selfConversation {
+            print("   ✅ Self-conversation found with \(selfConv.messageCount) messages")
+            // Should have at least 1 message (the self-message we sent)
+            #expect(selfConv.messageCount >= 1, "Self-conversation should have at least 1 message")
+        }
+
+        // Send another message and verify it also appears
+        print("\n📤 Sending second self-message...")
+        let secondMessage = "This is my second message to myself! 🎯"
+        let result2 = try await chat.send(secondMessage, to: refreshedConv, options: .indexed)
+        print("   ✅ Second message sent. TX: \(result2.txid.prefix(12))...")
+
+        // Refresh and verify
+        refreshedConv = try await chat.refresh(refreshedConv)
+        print("   Found \(refreshedConv.messageCount) messages after second send")
+
+        let allSentMessages = refreshedConv.sentMessages.map { $0.content }
+        #expect(allSentMessages.contains(selfMessage), "First self-message should still be present")
+        #expect(allSentMessages.contains(secondMessage), "Second self-message should be present")
+
+        print("\n" + String(repeating: "=", count: 60))
+        print("✅ SELF-MESSAGING TEST PASSED!")
+        print(String(repeating: "=", count: 60))
+        print("\n📊 Summary:")
+        print("   • Created 1 account")
+        print("   • Published encryption key")
+        print("   • Sent 2 messages to self with .indexed option")
+        print("   • All messages visible immediately after send")
+        print("   • Self-conversation appears in conversations list")
+        print("\n🎉 Self-messaging works correctly!\n")
     }
 }
 

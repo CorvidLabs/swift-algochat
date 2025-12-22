@@ -155,19 +155,20 @@ public actor AlgoChat {
     ///   - message: The plaintext message (max ~962 bytes when UTF-8 encoded)
     ///   - conversation: The conversation to send to
     ///   - options: Send options (default: fire-and-forget)
-    /// - Returns: The transaction ID
+    /// - Returns: SendResult containing the transaction ID and sent message
     ///
     /// Example usage:
     /// ```swift
     /// // Simple send
-    /// let txid = try await chat.send("Hello!", to: conversation)
+    /// let result = try await chat.send("Hello!", to: conversation)
     ///
-    /// // Send and wait for confirmation
-    /// let txid = try await chat.send("Hello!", to: conversation, options: .confirmed)
+    /// // Send and wait for confirmation, then update locally
+    /// let result = try await chat.send("Hello!", to: conversation, options: .confirmed)
+    /// conversation.append(result.message)
     ///
     /// // Send a reply
     /// if let lastMsg = conversation.lastReceived {
-    ///     let txid = try await chat.send(
+    ///     let result = try await chat.send(
     ///         "Thanks!",
     ///         to: conversation,
     ///         options: .replying(to: lastMsg, confirmed: true)
@@ -179,7 +180,7 @@ public actor AlgoChat {
         _ message: String,
         to conversation: Conversation,
         options: SendOptions = .default
-    ) async throws -> String {
+    ) async throws -> SendResult {
         // Get recipient's encryption public key
         let pubKey: Curve25519.KeyAgreement.PublicKey
         if let cached = conversation.participantEncryptionKey {
@@ -221,15 +222,37 @@ public actor AlgoChat {
         // Submit transaction
         let txid = try await algokit.algodClient.sendTransaction(signedTx)
 
-        // Wait for confirmation if requested
+        // Wait for confirmation if requested and get round info
+        var confirmedRound: UInt64 = 0
+        let timestamp = Date()
+
         if options.waitForConfirmation {
-            _ = try await algokit.algodClient.waitForConfirmation(
+            let confirmation = try await algokit.algodClient.waitForConfirmation(
                 transactionID: txid,
                 timeout: options.timeout
             )
+            confirmedRound = confirmation.confirmedRound ?? 0
+            // Use current time as timestamp (close enough for display purposes)
         }
 
-        return txid
+        // Wait for indexer if requested (ensures message is visible when fetching)
+        if options.waitForIndexer {
+            _ = await indexer.waitForTransaction(txid, timeout: options.indexerTimeout)
+        }
+
+        // Build the sent message for optimistic local update
+        let sentMessage = Message(
+            id: txid,
+            sender: account.address,
+            recipient: conversation.participant,
+            content: message,
+            timestamp: timestamp,
+            confirmedRound: confirmedRound,
+            direction: .sent,
+            replyContext: options.replyContext
+        )
+
+        return SendResult(txid: txid, message: sentMessage)
     }
 
     /// Sends a message to an address (convenience for one-off messages)
@@ -240,7 +263,7 @@ public actor AlgoChat {
         _ message: String,
         to recipient: Address,
         options: SendOptions = .default
-    ) async throws -> String {
+    ) async throws -> SendResult {
         let conv = try await conversation(with: recipient)
         return try await send(message, to: conv, options: options)
     }

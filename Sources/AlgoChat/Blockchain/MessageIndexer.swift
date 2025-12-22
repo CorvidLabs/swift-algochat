@@ -149,6 +149,51 @@ public actor MessageIndexer {
         throw ChatError.publicKeyNotFound(address.description)
     }
 
+    /// Polls the indexer until a specific transaction appears
+    ///
+    /// This is useful for waiting until a recently-confirmed transaction
+    /// becomes visible in the indexer, which may lag behind algod.
+    ///
+    /// - Parameters:
+    ///   - txid: The transaction ID to wait for
+    ///   - timeout: Maximum time to wait in seconds
+    ///   - pollInterval: Time between polls (default: 0.5 seconds)
+    /// - Returns: true if the transaction was found, false if timeout
+    public func waitForTransaction(
+        _ txid: String,
+        timeout: TimeInterval,
+        pollInterval: TimeInterval = 0.5
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            // Query indexer for transactions from our account
+            do {
+                let response = try await indexerClient.searchTransactions(
+                    address: chatAccount.address,
+                    limit: 50
+                )
+
+                // Check if the transaction appears in results
+                if response.transactions.contains(where: { $0.id == txid }) {
+                    return true
+                }
+            } catch {
+                // Indexer error - keep trying
+            }
+
+            // Wait before next poll
+            try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
+
+            // Check for cancellation
+            if Task.isCancelled {
+                return false
+            }
+        }
+
+        return false
+    }
+
     // MARK: - Private
 
     private func isChatMessage(_ data: Data) -> Bool {

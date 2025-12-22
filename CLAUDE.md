@@ -26,7 +26,7 @@ AlgoChat enables end-to-end encrypted messaging using Algorand transactions. Mes
 │    ├── EncryptionKeyStorage Protocol for key storage        │
 │    └── KeychainKeyStorage   Biometric-protected storage     │
 ├─────────────────────────────────────────────────────────────┤
-│  Demo App (AlgoChatDemo)    Interactive CLI demo            │
+│  CLI (AlgoChatCLI)          Interactive command-line tool   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -47,11 +47,11 @@ AlgoChat enables end-to-end encrypted messaging using Algorand transactions. Mes
 | `Storage/EncryptionKeyStorage.swift` | Protocol for key storage |
 | `Storage/KeychainKeyStorage.swift` | Keychain with biometric protection |
 
-### Demo (`Sources/AlgoChatDemo/`)
+### CLI (`Sources/AlgoChatCLI/`)
 
 | File | Purpose |
 |------|---------|
-| `AlgoChatDemo.swift` | Interactive CLI using swift-cli |
+| `AlgoChatCLI.swift` | Interactive command-line tool using swift-cli |
 
 ### Tests (`Tests/AlgoChatTests/`)
 
@@ -68,9 +68,9 @@ AlgoChat enables end-to-end encrypted messaging using Algorand transactions. Mes
 swift build
 ```
 
-### Run Demo
+### Run CLI
 ```bash
-swift run algochat-demo
+swift run algochat
 ```
 
 ### Run Tests
@@ -101,7 +101,7 @@ algokit localnet stop    # Stop
 | `swift-algokit` (CorvidLabs) | Algorand blockchain client |
 | `swift-algorand` (CorvidLabs) | Low-level Algorand types |
 | `swift-crypto` (Apple) | X25519, ChaCha20-Poly1305, HKDF |
-| `swift-cli` (CorvidLabs) | Terminal UI for demo |
+| `swift-cli` (CorvidLabs) | Terminal UI for CLI |
 
 ## Code Patterns
 

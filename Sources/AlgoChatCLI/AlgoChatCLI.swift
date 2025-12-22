@@ -5,7 +5,7 @@ import CLI
 import Foundation
 
 @main
-struct AlgoChatDemo {
+struct AlgoChatCLI {
     // MARK: - Constants
 
     /// Maximum message size in bytes (transaction note limit minus envelope overhead)
@@ -110,9 +110,8 @@ struct AlgoChatDemo {
                 await terminal.writeLine("")
 
                 var menuOptions = [
-                    "Send a message",
-                    "Check messages",
                     "View conversations",
+                    "Send a message",
                     "Publish encryption key",
                     "Account info"
                 ]
@@ -130,12 +129,10 @@ struct AlgoChatDemo {
                 )
 
                 switch action {
-                case "Send a message":
-                    try await sendMessage(chat: chat!, terminal: terminal)
-                case "Check messages":
-                    try await checkMessages(chat: chat!, terminal: terminal)
                 case "View conversations":
                     try await viewConversations(chat: chat!, terminal: terminal)
+                case "Send a message":
+                    try await sendMessage(chat: chat!, terminal: terminal)
                 case "Publish encryption key":
                     try await publishEncryptionKey(chat: chat!, terminal: terminal)
                 case "Account info":
@@ -430,19 +427,35 @@ struct AlgoChatDemo {
         }
 
         do {
-            let txid = try await terminal.withSpinner(
-                message: "Encrypting and sending message",
+            // Use .indexed for self-messages to ensure they appear immediately
+            let myAddress = await chat.address
+            let isSelfMessage = recipient == myAddress
+            let sendOptions: SendOptions = isSelfMessage ? .indexed : .confirmed
+            let spinnerMessage = isSelfMessage
+                ? "Encrypting and sending message (waiting for indexer)"
+                : "Encrypting and sending message"
+
+            let result = try await terminal.withSpinner(
+                message: spinnerMessage,
                 style: .dots
             ) {
-                try await chat.send(message, to: recipient, options: .confirmed)
+                try await chat.send(message, to: recipient, options: sendOptions)
             }
 
             await terminal.writeLine("")
             await terminal.writeLine("✅ Message sent successfully!".green.bold)
-            await terminal.writeLine("Transaction: ".dim + txid.cyan)
+            await terminal.writeLine("Transaction: ".dim + result.txid.cyan)
             if !isLocalnet {
-                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(result.txid)".blue.underline)
             }
+
+            // Navigate to conversation with the sent message
+            try await viewConversation(
+                chat: chat,
+                participant: recipient,
+                terminal: terminal,
+                initialMessage: result.message
+            )
         } catch ChatError.publicKeyNotFound {
             await terminal.writeLine("")
             await terminal.writeLine("⚠️  Recipient's encryption key not found.".yellow.bold)
@@ -454,29 +467,12 @@ struct AlgoChatDemo {
         }
     }
 
-    static func checkMessages(chat: AlgoChat, terminal: Terminal) async throws {
-        await terminal.writeLine("")
-
-        let fromStr = try await terminal.input("From address (or Enter for all)")
-
-        if fromStr.isEmpty {
-            // Show all conversations
-            try await viewConversations(chat: chat, terminal: terminal)
-            return
-        }
-
-        let from: Address
-        do {
-            from = try Address(string: fromStr)
-        } catch {
-            await terminal.writeLine("Invalid address format.".red)
-            return
-        }
-
-        try await viewConversation(chat: chat, participant: from, terminal: terminal)
-    }
-
-    static func viewConversation(chat: AlgoChat, participant: Address, terminal: Terminal) async throws {
+    static func viewConversation(
+        chat: AlgoChat,
+        participant: Address,
+        terminal: Terminal,
+        initialMessage: Message? = nil
+    ) async throws {
         // Initial load using conversation-first API
         var conversation = try await terminal.withSpinner(
             message: "Fetching messages",
@@ -485,6 +481,11 @@ struct AlgoChatDemo {
             var conv = try await chat.conversation(with: participant)
             conv = try await chat.refresh(conv)
             return conv
+        }
+
+        // Merge initial message if provided (handles indexer latency)
+        if let msg = initialMessage {
+            conversation.append(msg)
         }
 
         while true {
@@ -541,14 +542,16 @@ struct AlgoChatDemo {
             switch action {
             case "Reply to last message":
                 if let original = conversation.lastReceived {
-                    try await sendReply(chat: chat, conversation: conversation, replyingTo: original, terminal: terminal)
-                    // Refresh conversation after sending
-                    conversation = try await chat.refresh(conversation)
+                    if let sentMessage = try await sendReply(chat: chat, conversation: conversation, replyingTo: original, terminal: terminal) {
+                        // Append sent message locally for immediate display
+                        conversation.append(sentMessage)
+                    }
                 }
             case "Send new message":
-                try await sendMessageTo(chat: chat, conversation: conversation, terminal: terminal)
-                // Refresh conversation after sending
-                conversation = try await chat.refresh(conversation)
+                if let sentMessage = try await sendMessageTo(chat: chat, conversation: conversation, terminal: terminal) {
+                    // Append sent message locally for immediate display
+                    conversation.append(sentMessage)
+                }
             case "Refresh":
                 let currentConv = conversation
                 conversation = try await terminal.withSpinner(
@@ -565,34 +568,42 @@ struct AlgoChatDemo {
         }
     }
 
-    static func sendMessageTo(chat: AlgoChat, conversation: Conversation, terminal: Terminal) async throws {
+    static func sendMessageTo(chat: AlgoChat, conversation: Conversation, terminal: Terminal) async throws -> Message? {
         let message = try await terminal.input("Your message (max \(maxMessageBytes) bytes)")
 
         if message.isEmpty {
             await terminal.writeLine("Cancelled.".yellow)
-            return
+            return nil
         }
 
         // Validate message size
         if message.utf8.count > maxMessageBytes {
             await terminal.writeLine("Message too large (max \(maxMessageBytes) bytes).".red)
-            return
+            return nil
         }
 
         do {
-            let txid = try await terminal.withSpinner(
-                message: "Sending",
+            // Use .indexed for self-messages to ensure they appear immediately
+            let myAddress = await chat.address
+            let isSelfMessage = conversation.participant == myAddress
+            let sendOptions: SendOptions = isSelfMessage ? .indexed : .confirmed
+            let spinnerMessage = isSelfMessage ? "Sending (waiting for indexer)" : "Sending"
+
+            let result = try await terminal.withSpinner(
+                message: spinnerMessage,
                 style: .dots
             ) {
-                try await chat.send(message, to: conversation, options: .confirmed)
+                try await chat.send(message, to: conversation, options: sendOptions)
             }
 
-            await terminal.writeLine("✅ Sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
+            await terminal.writeLine("✅ Sent!".green + " TX: \(String(result.txid.prefix(12)))...".dim)
             if !isLocalnet {
-                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(result.txid)".blue.underline)
             }
+            return result.message
         } catch {
             await terminal.writeLine("❌ Failed: \(error.localizedDescription)".red)
+            return nil
         }
     }
 
@@ -601,7 +612,7 @@ struct AlgoChatDemo {
         conversation: Conversation,
         replyingTo original: Message,
         terminal: Terminal
-    ) async throws {
+    ) async throws -> Message? {
         await terminal.writeLine("")
         await terminal.writeLine("Replying to: ".dim + "\"\(truncatePreview(original.content, length: 50))\"".cyan)
 
@@ -609,29 +620,40 @@ struct AlgoChatDemo {
 
         if reply.isEmpty {
             await terminal.writeLine("Cancelled.".yellow)
-            return
+            return nil
         }
 
         // Validate message size
         if reply.utf8.count > maxMessageBytes {
             await terminal.writeLine("Reply too large (max \(maxMessageBytes) bytes).".red)
-            return
+            return nil
         }
 
         do {
-            let txid = try await terminal.withSpinner(
-                message: "Sending reply",
+            // Use indexed: true for self-messages to ensure they appear immediately
+            let myAddress = await chat.address
+            let isSelfMessage = conversation.participant == myAddress
+            let spinnerMessage = isSelfMessage ? "Sending reply (waiting for indexer)" : "Sending reply"
+
+            let result = try await terminal.withSpinner(
+                message: spinnerMessage,
                 style: .dots
             ) {
-                try await chat.send(reply, to: conversation, options: .replying(to: original, confirmed: true))
+                try await chat.send(
+                    reply,
+                    to: conversation,
+                    options: .replying(to: original, confirmed: true, indexed: isSelfMessage)
+                )
             }
 
-            await terminal.writeLine("✅ Reply sent!".green + " TX: \(String(txid.prefix(12)))...".dim)
+            await terminal.writeLine("✅ Reply sent!".green + " TX: \(String(result.txid.prefix(12)))...".dim)
             if !isLocalnet {
-                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(txid)".blue.underline)
+                await terminal.writeLine("Explorer: ".dim + "https://testnet.explorer.perawallet.app/tx/\(result.txid)".blue.underline)
             }
+            return result.message
         } catch {
             await terminal.writeLine("❌ Failed: \(error.localizedDescription)".red)
+            return nil
         }
     }
 
