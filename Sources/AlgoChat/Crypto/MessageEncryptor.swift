@@ -3,6 +3,9 @@ import Foundation
 
 /// Encrypts and decrypts chat messages using ChaCha20-Poly1305
 public enum MessageEncryptor {
+    /// Salt for HKDF key derivation
+    private static let hkdfSalt = Data("AlgoChat-v1-salt".utf8)
+
     /// Shared info for HKDF key derivation
     private static let sharedInfo = Data("AlgoChat-v1-message".utf8)
 
@@ -97,7 +100,7 @@ public enum MessageEncryptor {
         // Derive symmetric key using HKDF
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
-            salt: Data(),
+            salt: hkdfSalt,
             sharedInfo: sharedInfo,
             outputByteCount: 32
         )
@@ -187,7 +190,7 @@ public enum MessageEncryptor {
         // Derive symmetric key
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
-            salt: Data(),
+            salt: hkdfSalt,
             sharedInfo: sharedInfo,
             outputByteCount: 32
         )
