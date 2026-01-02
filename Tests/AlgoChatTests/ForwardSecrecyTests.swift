@@ -629,6 +629,23 @@ struct EdgeCaseTests {
         #expect(decrypted?.text == message)
     }
 
+    @Test("Boundary size message one byte over V2 max fails")
+    func testBoundarySizeOneOverMax() throws {
+        let senderKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+
+        // One byte over V2 max (931 bytes)
+        let message = String(repeating: "X", count: 931)
+
+        #expect(throws: ChatError.self) {
+            _ = try MessageEncryptor.encrypt(
+                message: message,
+                senderPrivateKey: senderKey,
+                recipientPublicKey: recipientKey.publicKey
+            )
+        }
+    }
+
     @Test("Reply with special characters in preview")
     func testReplyWithSpecialCharacters() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()

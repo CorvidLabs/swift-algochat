@@ -83,7 +83,12 @@ public struct ChatEnvelope: Sendable {
     // MARK: - Initialization
 
     /// Creates a V1 envelope (legacy, no forward secrecy)
+    ///
+    /// - Precondition: `senderPublicKey` must be 32 bytes (X25519 public key)
+    /// - Precondition: `nonce` must be 12 bytes (ChaCha20-Poly1305 nonce)
     public init(senderPublicKey: Data, nonce: Data, ciphertext: Data) {
+        precondition(senderPublicKey.count == 32, "Sender public key must be 32 bytes")
+        precondition(nonce.count == 12, "Nonce must be 12 bytes")
         self.envelopeVersion = Self.versionV1
         self.senderPublicKey = senderPublicKey
         self.ephemeralPublicKey = nil
@@ -92,12 +97,19 @@ public struct ChatEnvelope: Sendable {
     }
 
     /// Creates a V2 envelope with forward secrecy
+    ///
+    /// - Precondition: `senderPublicKey` must be 32 bytes (X25519 public key)
+    /// - Precondition: `ephemeralPublicKey` must be 32 bytes (X25519 public key)
+    /// - Precondition: `nonce` must be 12 bytes (ChaCha20-Poly1305 nonce)
     public init(
         senderPublicKey: Data,
         ephemeralPublicKey: Data,
         nonce: Data,
         ciphertext: Data
     ) {
+        precondition(senderPublicKey.count == 32, "Sender public key must be 32 bytes")
+        precondition(ephemeralPublicKey.count == 32, "Ephemeral public key must be 32 bytes")
+        precondition(nonce.count == 12, "Nonce must be 12 bytes")
         self.envelopeVersion = Self.versionV2
         self.senderPublicKey = senderPublicKey
         self.ephemeralPublicKey = ephemeralPublicKey

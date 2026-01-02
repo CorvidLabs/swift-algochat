@@ -236,7 +236,17 @@ struct ForwardSecrecyProof {
             print("  - Ephemeral private key was never saved")
             print("  - Even compromising sender's static key doesn't help")
 
+            // Actually attempt decryption with the wrong key
+            print("\nAttempting decryption with sender's key (should fail)...")
+            _ = try MessageEncryptor.decrypt(
+                envelope: envelope,
+                recipientPrivateKey: sender  // Attacker uses sender's key
+            )
+            attackSucceeded = true  // Should never reach here
+        } catch {
             attackSucceeded = false
+            print("Attacker decryption: ❌ FAILED (as expected)")
+            print("Error: \(error)")
         }
 
         // Legitimate recipient CAN still decrypt

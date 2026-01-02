@@ -140,8 +140,8 @@ public enum MessageEncryptor {
         guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
             throw ChatError.randomGenerationFailed
         }
+        defer { try? urandom.close() }
         let randomData = urandom.readData(ofLength: 12)
-        try? urandom.close()
         guard randomData.count == 12 else {
             throw ChatError.randomGenerationFailed
         }

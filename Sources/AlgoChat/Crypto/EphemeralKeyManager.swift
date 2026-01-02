@@ -1,4 +1,4 @@
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// Manages ephemeral key generation for forward secrecy
@@ -48,7 +48,7 @@ public struct EphemeralKeyManager: Sendable {
         info.append(recipientPublicKey.rawRepresentation)
 
         // Use HKDF to derive the symmetric key
-        // Salt includes the ephemeral public key for additional binding
+        // Salt is the ephemeral public key for domain separation
         let salt = ephemeralPrivateKey.publicKey.rawRepresentation
 
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
