@@ -27,8 +27,10 @@ struct ChatEnvelopeTests {
 
     @Test("Envelope includes version and protocol bytes")
     func testEnvelopeHeader() throws {
+        // Create V2 envelope (current default)
         let envelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0, count: 32),
+            ephemeralPublicKey: Data(repeating: 0, count: 32),
             nonce: Data(repeating: 0, count: 12),
             ciphertext: Data(repeating: 0, count: 20)
         )
