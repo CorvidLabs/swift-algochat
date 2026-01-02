@@ -11,7 +11,7 @@ struct KeyStorageTests {
     // MARK: - In-Memory Storage Tests (for testing without biometric)
 
     /// A simple in-memory implementation for testing
-    actor MockKeyStorage: EncryptionKeyStorage {
+    actor MockKeyStorage: @preconcurrency EncryptionKeyStorage {
         private var keys: [String: Data] = [:]
 
         func store(
