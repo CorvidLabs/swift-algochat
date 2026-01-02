@@ -3,7 +3,13 @@ import SwiftUI
 
 struct MessageThreadView: View {
     @EnvironmentObject private var appState: ApplicationState
+    @EnvironmentObject private var contactsStore: ContactsStore
     @State private var isRefreshing = false
+    @State private var showProfile = false
+
+    private var address: String? {
+        appState.selectedConversation?.participant.description
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,7 +45,25 @@ struct MessageThreadView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem {
+            ToolbarItemGroup {
+                if let addr = address {
+                    Button {
+                        contactsStore.toggleFavorite(address: addr)
+                    } label: {
+                        Label(
+                            "Favorite",
+                            systemImage: contactsStore.isFavorite(address: addr) ? "star.fill" : "star"
+                        )
+                    }
+                    .foregroundStyle(contactsStore.isFavorite(address: addr) ? .yellow : .secondary)
+
+                    Button {
+                        showProfile = true
+                    } label: {
+                        Label("Profile", systemImage: "person.crop.circle")
+                    }
+                }
+
                 Button {
                     Task {
                         isRefreshing = true
@@ -57,11 +81,23 @@ struct MessageThreadView: View {
                 .disabled(isRefreshing)
             }
         }
+        .sheet(isPresented: $showProfile) {
+            if let addr = address {
+                ProfileView(address: addr)
+            }
+        }
     }
 
     private var conversationTitle: String {
         guard let conversation = appState.selectedConversation else { return "Messages" }
         let addr = conversation.participant.description
+
+        // Check for contact name
+        if let contact = contactsStore.contact(for: addr), !contact.name.isEmpty {
+            return contact.name
+        }
+
+        // Fallback to truncated address
         if addr.count > 12 {
             return "\(addr.prefix(6))...\(addr.suffix(4))"
         }
@@ -105,6 +141,7 @@ struct MessageBubble: View {
                     .background(isSent ? Color.blue : Color.chatBubbleBackground)
                     .foregroundStyle(isSent ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .textSelection(.enabled)
 
                 // Timestamp
                 Text(formatTimestamp(message.timestamp))
@@ -150,5 +187,6 @@ struct MessageBubble: View {
     NavigationStack {
         MessageThreadView()
             .environmentObject(ApplicationState())
+            .environmentObject(ContactsStore())
     }
 }
