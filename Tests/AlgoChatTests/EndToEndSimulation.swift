@@ -3,6 +3,10 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
+#if canImport(Security)
+import Security
+#endif
+
 /// END-TO-END SIMULATION TESTS
 /// Simulates months/years of real-world usage to prove the system works correctly.
 /// Tests multi-user scenarios, key changes, security boundaries, and edge cases.
@@ -834,7 +838,13 @@ struct MigrationTests {
             )
 
             var nonceBytes = [UInt8](repeating: 0, count: 12)
+            #if canImport(Security)
             _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+            #else
+            let urandom = FileHandle(forReadingAtPath: "/dev/urandom")!
+            nonceBytes = [UInt8](urandom.readData(ofLength: 12))
+            try? urandom.close()
+            #endif
             let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
             let plaintext = "Legacy V1 message #\(i)"

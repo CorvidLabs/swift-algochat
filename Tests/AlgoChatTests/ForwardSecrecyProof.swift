@@ -3,6 +3,10 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
+#if canImport(Security)
+import Security
+#endif
+
 /// FORWARD SECRECY PROOF DEMONSTRATION
 /// This test suite provides cryptographic proof that the implementation is correct.
 /// Each test demonstrates a specific security property with visible evidence.
@@ -269,7 +273,13 @@ struct ForwardSecrecyProof {
         )
 
         var nonceBytes = [UInt8](repeating: 0, count: 12)
+        #if canImport(Security)
         _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+        #else
+        let urandom = FileHandle(forReadingAtPath: "/dev/urandom")!
+        nonceBytes = [UInt8](urandom.readData(ofLength: 12))
+        try? urandom.close()
+        #endif
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
         let legacyMessage = "Legacy V1 message from old client"
