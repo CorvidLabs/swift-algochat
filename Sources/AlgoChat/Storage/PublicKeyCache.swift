@@ -1,5 +1,5 @@
 import Algorand
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// Protocol for caching discovered public keys

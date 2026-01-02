@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 import Algorand
-import Crypto
+@preconcurrency import Crypto
 @preconcurrency import Foundation
 import LocalAuthentication
 import Security
@@ -257,7 +257,7 @@ public actor KeychainKeyStorage: EncryptionKeyStorage {
 
 // Fallback for unsupported platforms (tvOS, watchOS, Linux)
 import Algorand
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// In-memory key storage for platforms without Keychain support

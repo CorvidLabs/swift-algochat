@@ -1,5 +1,5 @@
 import Algorand
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// Handles derivation of encryption keys from Algorand signing keys

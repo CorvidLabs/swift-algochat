@@ -1,6 +1,6 @@
 import Algorand
 import AlgoKit
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// Main entry point for the AlgoChat library

@@ -1,6 +1,6 @@
 import Algorand
 import AlgoKit
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// Queries and retrieves messages from the blockchain

@@ -1,9 +1,12 @@
 import Algorand
-import Crypto
+@preconcurrency import Crypto
 import Foundation
 
 /// A chat-enabled Algorand account with encryption keys
-public struct ChatAccount: Sendable {
+///
+/// Note: Uses `@unchecked Sendable` because `Curve25519` keys from swift-crypto
+/// are not marked `Sendable` but are effectively immutable and thread-safe.
+public struct ChatAccount: @unchecked Sendable {
     /// The underlying Algorand account
     public let account: Account
 
