@@ -467,6 +467,10 @@ struct SecurityBoundaryTests {
 
         print("  Old messages attacker could decrypt: \(oldMessagesDecrypted)/50")
 
+        // Verify: recipient key compromise DOES expose old messages (expected behavior)
+        // This documents the security model - forward secrecy protects ephemeral keys, not recipient keys
+        #expect(oldMessagesDecrypted == 50, "All 50 old messages should be decryptable with compromised recipient key")
+
         // Phase 4: Bob rotates to new key
         bob = bob.rotateKey()
         print("\nPhase 4: Bob rotates to NEW key: \(bob.publicKey.rawRepresentation.prefix(8).hex)...")
@@ -841,9 +845,11 @@ struct MigrationTests {
             #if canImport(Security)
             _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
             #else
-            let urandom = FileHandle(forReadingAtPath: "/dev/urandom")!
+            guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
+            }
+            defer { try? urandom.close() }
             nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-            try? urandom.close()
             #endif
             let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 

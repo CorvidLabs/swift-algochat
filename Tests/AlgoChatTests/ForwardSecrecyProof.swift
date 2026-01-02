@@ -286,9 +286,11 @@ struct ForwardSecrecyProof {
         #if canImport(Security)
         _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
         #else
-        let urandom = FileHandle(forReadingAtPath: "/dev/urandom")!
+        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+            throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
+        }
+        defer { try? urandom.close() }
         nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-        try? urandom.close()
         #endif
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 

@@ -10,7 +10,7 @@ import Foundation
 /// - Sender Public Key: 32 bytes (X25519 static)
 /// - Nonce: 12 bytes (ChaCha20-Poly1305)
 /// - Ciphertext + Tag: remaining bytes
-/// - Overhead: 62 bytes, max message: 962 bytes
+/// - Overhead: 62 bytes (46-byte header + 16-byte tag), max message: 962 bytes
 ///
 /// **V2 (Forward Secrecy)** - Ephemeral key encryption:
 /// - Version: 1 byte (0x02)
@@ -19,7 +19,7 @@ import Foundation
 /// - Sender Ephemeral Public Key: 32 bytes (X25519)
 /// - Nonce: 12 bytes (ChaCha20-Poly1305)
 /// - Ciphertext + Tag: remaining bytes
-/// - Overhead: 94 bytes, max message: 930 bytes
+/// - Overhead: 94 bytes (78-byte header + 16-byte tag), max message: 930 bytes
 public struct ChatEnvelope: Sendable {
     // MARK: - Version Constants
 
