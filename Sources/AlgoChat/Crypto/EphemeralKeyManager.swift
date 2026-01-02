@@ -1,12 +1,13 @@
 @preconcurrency import Crypto
 import Foundation
 
-/// Manages ephemeral key generation for forward secrecy
+/// Manages ephemeral key generation for per-message key isolation
 ///
 /// Each message uses a fresh ephemeral key pair. The symmetric encryption key
 /// is derived from the ephemeral private key and recipient's static public key.
-/// This provides forward secrecy - compromising a long-term key doesn't reveal
-/// past message contents.
+/// This provides sender-side forward secrecy: compromising the sender's key
+/// does not reveal past messages. Note: recipient key compromise exposes all
+/// messages encrypted to that recipient.
 public struct EphemeralKeyManager: Sendable {
     public init() {}
 

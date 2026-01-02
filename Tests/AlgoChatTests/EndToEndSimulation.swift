@@ -412,13 +412,13 @@ struct SecurityBoundaryTests {
         print("✅ All tampering attempts detected and rejected")
     }
 
-    @Test("Forward secrecy: Old messages safe after key compromise")
-    func testForwardSecrecyAfterCompromise() async throws {
+    @Test("Key rotation: New messages safe after key rotation")
+    func testKeyRotationProtection() async throws {
         let alice = SimulatedUser(name: "Alice")
         var bob = SimulatedUser(name: "Bob")
         let store = MessageStore()
 
-        print("\n=== FORWARD SECRECY: Key Compromise Scenario ===")
+        print("\n=== KEY ROTATION: Protection After Key Compromise ===")
 
         // Phase 1: Normal messaging (50 messages)
         print("Phase 1: Alice sends 50 messages to Bob...")
@@ -459,16 +459,15 @@ struct SecurityBoundaryTests {
             }
         }
 
-        // Note: With the CURRENT key, attacker CAN decrypt old messages
-        // Forward secrecy protects against EPHEMERAL key compromise, not recipient key
-        // If recipient's long-term key is compromised, old messages are readable
-        // BUT each message has unique ephemeral key, so compromising ONE message
-        // doesn't reveal others' ephemeral secrets
+        // Note: With the compromised recipient key, the attacker CAN decrypt all old messages.
+        // This is expected behavior - the implementation provides sender-side forward secrecy,
+        // not protection against recipient key compromise. Compromising the recipient's
+        // long-term key reveals all past messages encrypted to that key.
 
         print("  Old messages attacker could decrypt: \(oldMessagesDecrypted)/50")
 
         // Verify: recipient key compromise DOES expose old messages (expected behavior)
-        // This documents the security model - forward secrecy protects ephemeral keys, not recipient keys
+        // This documents the security model - sender-side forward secrecy, not recipient protection
         #expect(oldMessagesDecrypted == 50, "All 50 old messages should be decryptable with compromised recipient key")
 
         // Phase 4: Bob rotates to new key
@@ -749,12 +748,12 @@ struct LongTermUsageTests {
         print("Processing time: \(String(format: "%.2f", elapsed))s")
         print("Throughput: \(String(format: "%.0f", Double(totalMessages) / elapsed)) msg/sec")
 
-        // Verify all ephemeral keys are unique (forward secrecy)
+        // Verify all ephemeral keys are unique (per-message key isolation)
         #expect(ephemeralKeys.count == totalMessages, "All messages must have unique ephemeral keys!")
 
         print("\n✅ ONE YEAR SIMULATION PASSED")
         print("✅ \(totalMessages) messages encrypted/decrypted")
-        print("✅ \(ephemeralKeys.count) unique ephemeral keys (forward secrecy)")
+        print("✅ \(ephemeralKeys.count) unique ephemeral keys (per-message isolation)")
     }
 
     @Test("Concurrent conversations (10 users, 500 messages)")

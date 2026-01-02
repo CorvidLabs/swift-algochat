@@ -9,10 +9,11 @@ import Security
 ///
 /// Supports two encryption modes:
 /// - **V1 (Legacy)**: Static key ECDH - uses sender's static key for key agreement
-/// - **V2 (Forward Secrecy)**: Ephemeral key ECDH - generates fresh key per message
+/// - **V2 (Ephemeral Keys)**: Ephemeral key ECDH - generates fresh key per message
 ///
-/// V2 provides forward secrecy: compromising a long-term key does not reveal
-/// past message contents since each message uses a unique ephemeral key.
+/// V2 provides sender-side forward secrecy: compromising the sender's long-term key
+/// does not reveal past messages since ephemeral keys are never stored. However,
+/// if the recipient's key is compromised, past messages can be decrypted.
 public enum MessageEncryptor {
     // MARK: - V1 Constants (Legacy)
 
@@ -27,13 +28,14 @@ public enum MessageEncryptor {
     /// Ephemeral key manager for V2 encryption
     private static let ephemeralKeyManager = EphemeralKeyManager()
 
-    // MARK: - Encryption (V2 - Forward Secrecy)
+    // MARK: - Encryption (V2 - Ephemeral Keys)
 
-    /// Encrypts a message for a recipient with forward secrecy
+    /// Encrypts a message for a recipient using ephemeral key agreement
     ///
     /// Uses ephemeral key agreement: a fresh key pair is generated for each message,
-    /// providing forward secrecy. Even if long-term keys are compromised, past
-    /// messages remain secure.
+    /// providing sender-side forward secrecy. If the sender's key is compromised,
+    /// past messages remain secure. Note: recipient key compromise exposes all
+    /// messages encrypted to that recipient.
     ///
     /// - Parameters:
     ///   - message: The plaintext message
