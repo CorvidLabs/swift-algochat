@@ -10,6 +10,12 @@ public enum ChatError: Error, Sendable {
     /// Failed to decrypt message
     case decryptionFailed(String)
 
+    /// Failed to encode message as UTF-8
+    case encodingFailed(String)
+
+    /// Failed to generate secure random bytes
+    case randomGenerationFailed
+
     /// Invalid public key format
     case invalidPublicKey(String)
 
@@ -54,6 +60,10 @@ extension ChatError: LocalizedError {
             "Message exceeds maximum size of \(maxSize) bytes"
         case .decryptionFailed(let reason):
             "Failed to decrypt message: \(reason)"
+        case .encodingFailed(let reason):
+            "Failed to encode message: \(reason)"
+        case .randomGenerationFailed:
+            "Failed to generate secure random bytes"
         case .invalidPublicKey(let reason):
             "Invalid public key: \(reason)"
         case .keyDerivationFailed(let reason):

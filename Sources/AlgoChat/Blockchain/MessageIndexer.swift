@@ -135,10 +135,24 @@ public actor MessageIndexer {
     }
 
     /// Finds a user's encryption public key from their past transactions
-    public func findPublicKey(for address: Address) async throws -> Curve25519.KeyAgreement.PublicKey {
+    ///
+    /// Searches the user's transaction history to find an AlgoChat message
+    /// containing their public key. The search depth can be configured to
+    /// search more transactions at the cost of additional indexer queries.
+    ///
+    /// - Parameters:
+    ///   - address: The user's Algorand address
+    ///   - searchDepth: Number of transactions to search (default: 200)
+    /// - Returns: Their X25519 public key
+    /// - Throws: `ChatError.publicKeyNotFound` if no chat history exists
+    public func findPublicKey(
+        for address: Address,
+        searchDepth: Int = 200
+    ) async throws -> Curve25519.KeyAgreement.PublicKey {
+        // Search with configurable depth
         let response = try await indexerClient.searchTransactions(
             address: address,
-            limit: 100
+            limit: searchDepth
         )
 
         for tx in response.transactions {
@@ -157,20 +171,25 @@ public actor MessageIndexer {
 
     /// Polls the indexer until a specific transaction appears
     ///
-    /// This is useful for waiting until a recently-confirmed transaction
-    /// becomes visible in the indexer, which may lag behind algod.
+    /// Uses exponential backoff with jitter to reduce load on the indexer
+    /// while still providing timely notification when the transaction appears.
     ///
     /// - Parameters:
     ///   - txid: The transaction ID to wait for
     ///   - timeout: Maximum time to wait in seconds
-    ///   - pollInterval: Time between polls (default: 0.5 seconds)
+    ///   - initialInterval: Initial time between polls (default: 0.5 seconds)
+    ///   - maxInterval: Maximum time between polls (default: 5.0 seconds)
+    ///   - backoffMultiplier: Factor to increase interval each attempt (default: 1.5)
     /// - Returns: true if the transaction was found, false if timeout
     public func waitForTransaction(
         _ txid: String,
         timeout: TimeInterval,
-        pollInterval: TimeInterval = 0.5
+        initialInterval: TimeInterval = 0.5,
+        maxInterval: TimeInterval = 5.0,
+        backoffMultiplier: Double = 1.5
     ) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
+        var currentInterval = initialInterval
 
         while Date() < deadline {
             // Query indexer for transactions from our account
@@ -185,11 +204,16 @@ public actor MessageIndexer {
                     return true
                 }
             } catch {
-                // Indexer error - keep trying
+                // Indexer error - keep trying with backoff
             }
 
-            // Wait before next poll
-            try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
+            // Exponential backoff with jitter (±20%)
+            let jitter = Double.random(in: 0.8...1.2)
+            let sleepInterval = currentInterval * jitter
+            try? await Task.sleep(nanoseconds: UInt64(sleepInterval * 1_000_000_000))
+
+            // Increase interval for next attempt (capped at maxInterval)
+            currentInterval = min(currentInterval * backoffMultiplier, maxInterval)
 
             // Check for cancellation
             if Task.isCancelled {

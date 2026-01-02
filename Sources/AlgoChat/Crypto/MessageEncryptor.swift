@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import Security
 
 /// Encrypts and decrypts chat messages using ChaCha20-Poly1305
 public enum MessageEncryptor {
@@ -24,8 +25,11 @@ public enum MessageEncryptor {
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey
     ) throws -> ChatEnvelope {
-        try encryptData(
-            message.data(using: .utf8)!,
+        guard let messageData = message.data(using: .utf8) else {
+            throw ChatError.encodingFailed("Failed to encode message as UTF-8")
+        }
+        return try encryptData(
+            messageData,
             senderPrivateKey: senderPrivateKey,
             recipientPublicKey: recipientPublicKey
         )
@@ -105,10 +109,11 @@ public enum MessageEncryptor {
             outputByteCount: 32
         )
 
-        // Generate random nonce (12 bytes for ChaCha20-Poly1305)
+        // Generate random nonce using cryptographically secure random (12 bytes for ChaCha20-Poly1305)
         var nonceBytes = [UInt8](repeating: 0, count: 12)
-        for i in 0..<12 {
-            nonceBytes[i] = UInt8.random(in: 0...255)
+        let status = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+        guard status == errSecSuccess else {
+            throw ChatError.randomGenerationFailed
         }
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 

@@ -41,6 +41,12 @@ public actor AlgoChat {
     /// The message indexer for fetching messages
     private let indexer: MessageIndexer
 
+    /// Optional message cache for offline access
+    private let messageCache: (any MessageCache)?
+
+    /// Public key cache for reducing blockchain lookups
+    private let publicKeyCache: PublicKeyCache
+
     // MARK: - Initialization
 
     /// Creates a new AlgoChat client
@@ -48,9 +54,18 @@ public actor AlgoChat {
     /// - Parameters:
     ///   - network: The Algorand network to connect to
     ///   - account: The Algorand account to use for chat
-    public init(network: AlgorandConfiguration.Network, account: Account) async throws {
+    ///   - messageCache: Optional message cache for offline access
+    ///   - publicKeyCache: Optional public key cache (default: in-memory with 24h TTL)
+    public init(
+        network: AlgorandConfiguration.Network,
+        account: Account,
+        messageCache: (any MessageCache)? = nil,
+        publicKeyCache: PublicKeyCache? = nil
+    ) async throws {
         self.algokit = AlgoKit(network: network)
         self.account = try ChatAccount(account: account)
+        self.messageCache = messageCache
+        self.publicKeyCache = publicKeyCache ?? PublicKeyCache()
 
         guard let indexerClient = await algokit.indexerClient else {
             throw ChatError.indexerNotConfigured
@@ -67,9 +82,18 @@ public actor AlgoChat {
     /// - Parameters:
     ///   - configuration: Custom Algorand configuration
     ///   - account: The Algorand account to use for chat
-    public init(configuration: AlgorandConfiguration, account: Account) async throws {
+    ///   - messageCache: Optional message cache for offline access
+    ///   - publicKeyCache: Optional public key cache (default: in-memory with 24h TTL)
+    public init(
+        configuration: AlgorandConfiguration,
+        account: Account,
+        messageCache: (any MessageCache)? = nil,
+        publicKeyCache: PublicKeyCache? = nil
+    ) async throws {
         self.algokit = AlgoKit(configuration: configuration)
         self.account = try ChatAccount(account: account)
+        self.messageCache = messageCache
+        self.publicKeyCache = publicKeyCache ?? PublicKeyCache()
 
         guard let indexerClient = await algokit.indexerClient else {
             throw ChatError.indexerNotConfigured
@@ -113,6 +137,10 @@ public actor AlgoChat {
 
     /// Refreshes a conversation with the latest messages from the blockchain
     ///
+    /// This method uses incremental sync - it only fetches messages after the
+    /// last known round, reducing blockchain queries. Messages are also cached
+    /// locally if a message cache is configured.
+    ///
     /// - Parameters:
     ///   - conversation: The conversation to refresh
     ///   - limit: Maximum number of messages to fetch
@@ -123,9 +151,15 @@ public actor AlgoChat {
     ) async throws -> Conversation {
         var updated = conversation
 
+        // Determine starting round for incremental sync
+        var afterRound = conversation.lastFetchedRound
+        if afterRound == nil, let cache = messageCache {
+            afterRound = try? await cache.getLastSyncRound(for: conversation.participant)
+        }
+
         let messages = try await indexer.fetchMessages(
             with: conversation.participant,
-            afterRound: conversation.lastFetchedRound,
+            afterRound: afterRound,
             limit: limit
         )
 
@@ -133,6 +167,12 @@ public actor AlgoChat {
 
         if let lastRound = messages.map({ $0.confirmedRound }).max() {
             updated.lastFetchedRound = lastRound
+
+            // Cache the new messages
+            if let cache = messageCache, !messages.isEmpty {
+                try? await cache.store(messages, for: conversation.participant)
+                try? await cache.setLastSyncRound(lastRound, for: conversation.participant)
+            }
         }
 
         // Update public key if we found it from received messages
@@ -142,6 +182,15 @@ public actor AlgoChat {
         }
 
         return updated
+    }
+
+    /// Loads cached messages for a conversation (offline access)
+    ///
+    /// - Parameter participant: The conversation participant
+    /// - Returns: Cached messages, or empty array if no cache or cache miss
+    public func loadCached(for participant: Address) async -> [Message] {
+        guard let cache = messageCache else { return [] }
+        return (try? await cache.retrieve(for: participant, afterRound: nil)) ?? []
     }
 
     // MARK: - Sending Messages
@@ -277,8 +326,9 @@ public actor AlgoChat {
 
     /// Fetches a user's encryption public key from their past transactions
     ///
-    /// This scans the user's transaction history to find a previous AlgoChat
-    /// message and extracts the sender's public key from the envelope.
+    /// This first checks the local cache, then scans the user's transaction
+    /// history to find a previous AlgoChat message and extracts the sender's
+    /// public key from the envelope.
     ///
     /// - Parameter address: The user's Algorand address
     /// - Returns: Their X25519 public key
@@ -286,7 +336,18 @@ public actor AlgoChat {
     public func fetchPublicKey(
         for address: Address
     ) async throws -> Curve25519.KeyAgreement.PublicKey {
-        try await indexer.findPublicKey(for: address)
+        // Check cache first
+        if let cached = await publicKeyCache.retrieve(for: address) {
+            return cached
+        }
+
+        // Fetch from blockchain
+        let key = try await indexer.findPublicKey(for: address)
+
+        // Cache for future lookups
+        await publicKeyCache.store(key, for: address)
+
+        return key
     }
 
     /// Publishes the account's encryption public key to the blockchain
@@ -351,5 +412,30 @@ public actor AlgoChat {
     public func balance() async throws -> MicroAlgos {
         let info = try await algokit.algodClient.accountInformation(account.address)
         return MicroAlgos(info.amount)
+    }
+
+    // MARK: - Cache Management
+
+    /// Clears all cached data (messages and public keys)
+    public func clearCache() async throws {
+        try await messageCache?.clear()
+        await publicKeyCache.clear()
+    }
+
+    /// Clears cached data for a specific conversation
+    ///
+    /// - Parameter participant: The conversation participant
+    public func clearCache(for participant: Address) async throws {
+        try await messageCache?.clear(for: participant)
+        await publicKeyCache.invalidate(for: participant)
+    }
+
+    /// Invalidates a cached public key
+    ///
+    /// Use this if you suspect a cached key is stale or invalid.
+    ///
+    /// - Parameter address: The address to invalidate
+    public func invalidateCachedPublicKey(for address: Address) async {
+        await publicKeyCache.invalidate(for: address)
     }
 }
