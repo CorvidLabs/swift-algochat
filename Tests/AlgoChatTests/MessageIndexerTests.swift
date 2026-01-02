@@ -8,10 +8,12 @@ import Testing
 struct ChatEnvelopeValidationTests {
     @Test("Valid chat envelope has correct header bytes")
     func testValidEnvelopeHeader() throws {
+        // Create V2 envelope (current default)
         let envelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0x01, count: 32),
-            nonce: Data(repeating: 0x02, count: 12),
-            ciphertext: Data(repeating: 0x03, count: 50)
+            ephemeralPublicKey: Data(repeating: 0x02, count: 32),
+            nonce: Data(repeating: 0x03, count: 12),
+            ciphertext: Data(repeating: 0x04, count: 50)
         )
         let encoded = envelope.encode()
 
