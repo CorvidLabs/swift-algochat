@@ -1,6 +1,9 @@
 import Crypto
 import Foundation
+
+#if canImport(Security)
 import Security
+#endif
 
 /// Encrypts and decrypts chat messages using ChaCha20-Poly1305
 public enum MessageEncryptor {
@@ -111,10 +114,23 @@ public enum MessageEncryptor {
 
         // Generate random nonce using cryptographically secure random (12 bytes for ChaCha20-Poly1305)
         var nonceBytes = [UInt8](repeating: 0, count: 12)
+        #if canImport(Security)
         let status = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
         guard status == errSecSuccess else {
             throw ChatError.randomGenerationFailed
         }
+        #else
+        // Linux: use /dev/urandom which is cryptographically secure
+        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+            throw ChatError.randomGenerationFailed
+        }
+        let randomData = urandom.readData(ofLength: 12)
+        try? urandom.close()
+        guard randomData.count == 12 else {
+            throw ChatError.randomGenerationFailed
+        }
+        nonceBytes = [UInt8](randomData)
+        #endif
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
         // Encrypt with ChaCha20-Poly1305
