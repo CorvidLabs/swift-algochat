@@ -5,10 +5,10 @@ import PackageDescription
 let package = Package(
     name: "swift-algo-chat",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),  // Required by swift-cli
-        .tvOS(.v15),
-        .watchOS(.v8),
+        .iOS(.v17),
+        .macOS(.v14),
+        .tvOS(.v17),
+        .watchOS(.v10),
         .visionOS(.v1)
     ],
     products: [
@@ -19,6 +19,10 @@ let package = Package(
         .executable(
             name: "algochat",
             targets: ["AlgoChatCLI"]
+        ),
+        .executable(
+            name: "AlgoChatApp",
+            targets: ["AlgoChatApp"]
         )
     ],
     dependencies: [
@@ -43,6 +47,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AlgoChatTests",
+            dependencies: ["AlgoChat"]
+        ),
+        .executableTarget(
+            name: "AlgoChatApp",
             dependencies: ["AlgoChat"]
         )
     ]
