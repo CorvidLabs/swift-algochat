@@ -3,6 +3,10 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
+#if canImport(Security)
+import Security
+#endif
+
 @Suite("EphemeralKeyManager Tests")
 struct EphemeralKeyManagerTests {
     private let keyManager = EphemeralKeyManager()
@@ -421,7 +425,13 @@ struct V1BackwardCompatibilityTests {
         )
 
         var nonceBytes = [UInt8](repeating: 0, count: 12)
+        #if canImport(Security)
         _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+        #else
+        let urandom = FileHandle(forReadingAtPath: "/dev/urandom")!
+        nonceBytes = [UInt8](urandom.readData(ofLength: 12))
+        try? urandom.close()
+        #endif
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
         let sealedBox = try ChaChaPoly.seal(
@@ -479,7 +489,13 @@ struct V1BackwardCompatibilityTests {
         )
 
         var nonceBytes = [UInt8](repeating: 0, count: 12)
+        #if canImport(Security)
         _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+        #else
+        let urandom2 = FileHandle(forReadingAtPath: "/dev/urandom")!
+        nonceBytes = [UInt8](urandom2.readData(ofLength: 12))
+        try? urandom2.close()
+        #endif
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
         let sealedBox = try ChaChaPoly.seal(
