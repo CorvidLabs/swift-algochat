@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
-        run: swift build -v
+      - name: Build Library
+        run: swift build --target AlgoChat -v
 
       - name: Run tests
         run: swift test -v --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier|FileKeyStorage"
