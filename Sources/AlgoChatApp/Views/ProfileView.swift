@@ -183,15 +183,13 @@ struct ProfileView: View {
 
             do {
                 let address = try Algorand.Address(string: address)
-                let publicKey = try await chat.fetchPublicKey(for: address)
+                let discovered = try await chat.discoverKey(for: address)
 
                 // Generate fingerprint
-                keyFingerprint = SignatureVerifier.fingerprint(of: publicKey.rawRepresentation)
+                keyFingerprint = SignatureVerifier.fingerprint(of: discovered.publicKey.rawRepresentation)
 
-                // Check if the conversation has a verified key
-                // For now, we can't easily determine if the key was verified during discovery
-                // so we'll mark as verified if we have the key (future: track verification status)
-                isKeyVerified = false  // TODO: Track verification status from key discovery
+                // Use verification status from key discovery
+                isKeyVerified = discovered.isVerified
             } catch {
                 keyFingerprint = nil
                 isKeyVerified = false

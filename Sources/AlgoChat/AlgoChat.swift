@@ -367,12 +367,26 @@ public actor AlgoChat {
         }
 
         // Fetch from blockchain
-        let key = try await indexer.findPublicKey(for: address)
+        let discovered = try await indexer.findPublicKey(for: address)
 
         // Cache for future lookups
-        await publicKeyCache.store(key, for: address)
+        await publicKeyCache.store(discovered.publicKey, for: address)
 
-        return key
+        return discovered.publicKey
+    }
+
+    /// Discovers a user's encryption public key with verification status
+    ///
+    /// Unlike `fetchPublicKey`, this method returns whether the key was
+    /// cryptographically verified via a V3 signed envelope.
+    ///
+    /// - Parameter address: The user's Algorand address
+    /// - Returns: The discovered key with verification status
+    /// - Throws: `ChatError.publicKeyNotFound` if no chat history exists
+    public func discoverKey(
+        for address: Address
+    ) async throws -> DiscoveredKey {
+        try await indexer.findPublicKey(for: address)
     }
 
     /// Publishes the account's encryption public key to the blockchain

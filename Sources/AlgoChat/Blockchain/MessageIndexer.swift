@@ -143,12 +143,12 @@ public actor MessageIndexer {
     /// - Parameters:
     ///   - address: The user's Algorand address
     ///   - searchDepth: Number of transactions to search (default: 200)
-    /// - Returns: Their X25519 public key
+    /// - Returns: The discovered key with verification status
     /// - Throws: `ChatError.publicKeyNotFound` if no chat history exists
     public func findPublicKey(
         for address: Address,
         searchDepth: Int = 200
-    ) async throws -> Curve25519.KeyAgreement.PublicKey {
+    ) async throws -> DiscoveredKey {
         // Search with configurable depth
         let response = try await indexerClient.searchTransactions(
             address: address,
@@ -176,7 +176,8 @@ public actor MessageIndexer {
                 )
 
                 if isValid {
-                    return try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+                    let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+                    return DiscoveredKey(publicKey: publicKey, isVerified: true)
                 }
                 // Invalid signature - skip this transaction, try next
                 continue
@@ -198,7 +199,8 @@ public actor MessageIndexer {
 
             // Accept V1/V2 envelopes without signature (legacy compatibility)
             if !envelope.hasSignature {
-                return try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+                let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+                return DiscoveredKey(publicKey: publicKey, isVerified: false)
             }
         }
 
