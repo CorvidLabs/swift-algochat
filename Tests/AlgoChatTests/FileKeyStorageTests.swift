@@ -331,7 +331,17 @@ struct FileKeyStorageTests {
 
         // File should exist and have correct size
         // Format: salt (32) + nonce (12) + ciphertext (32) + tag (16) = 92 bytes
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let homeDir: URL
+        #if os(Linux)
+        if let home = ProcessInfo.processInfo.environment["HOME"] {
+            homeDir = URL(fileURLWithPath: home)
+        } else {
+            homeDir = URL(fileURLWithPath: "/tmp")
+        }
+        #else
+        homeDir = FileManager.default.homeDirectoryForCurrentUser
+        #endif
+
         let keyPath = homeDir
             .appendingPathComponent(".algochat/keys")
             .appendingPathComponent("\(address.description).key")
