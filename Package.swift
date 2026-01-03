@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-algo-chat",
+    name: "swift-algochat",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
