@@ -13,11 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Library
-        run: swift build --target AlgoChat -v
+      - name: Build Library and Tests
+        run: swift build --target AlgoChat --target AlgoChatTests -v
 
       - name: Run tests
-        run: swift test -v --skip AlgoChatApp --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier|FileKeyStorage"
+        run: swift test --skip-build -v --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier|FileKeyStorage"
 
   cli:
     runs-on: ubuntu-latest
