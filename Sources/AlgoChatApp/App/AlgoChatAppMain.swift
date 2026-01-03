@@ -14,6 +14,9 @@ struct AlgoChatAppMain: App {
             RootView()
                 .environmentObject(appState)
                 .environmentObject(contactsStore)
+                .task {
+                    await appState.loadSavedAccounts()
+                }
                 .onAppear {
                     activateWindow()
                 }

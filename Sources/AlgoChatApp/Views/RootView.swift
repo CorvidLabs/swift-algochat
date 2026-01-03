@@ -8,6 +8,8 @@ struct RootView: View {
         Group {
             if appState.isConnected {
                 MainView()
+            } else if !appState.savedAccounts.isEmpty {
+                AccountPickerView()
             } else {
                 LoginView()
             }

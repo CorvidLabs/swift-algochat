@@ -7,6 +7,7 @@ struct ConversationListView: View {
     @State private var showNewConversation = false
     @State private var showContacts = false
     @State private var showMyProfile = false
+    @State private var showAccountSettings = false
     @State private var isRefreshing = false
 
     private var favoriteConversations: [Conversation] {
@@ -81,6 +82,12 @@ struct ConversationListView: View {
                         Label("My Profile", systemImage: "person.crop.circle")
                     }
 
+                    Button {
+                        showAccountSettings = true
+                    } label: {
+                        Label("Account Settings", systemImage: "gearshape")
+                    }
+
                     if let balance = appState.accountBalance {
                         Text("Balance: \(balance.algos, specifier: "%.4f") ALGO")
                     }
@@ -107,6 +114,9 @@ struct ConversationListView: View {
         }
         .sheet(isPresented: $showMyProfile) {
             MyProfileView()
+        }
+        .sheet(isPresented: $showAccountSettings) {
+            AccountSettingsView()
         }
         .refreshable {
             await appState.loadConversations()

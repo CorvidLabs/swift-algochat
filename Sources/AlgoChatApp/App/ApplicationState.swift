@@ -13,11 +13,18 @@ final class ApplicationState: ObservableObject {
     @Published var conversations: [Conversation] = []
     @Published var selectedConversation: Conversation?
     @Published var accountBalance: MicroAlgos?
+    @Published private(set) var savedAccounts: [SavedAccount] = []
 
     // MARK: - Chat Client
 
     private(set) var chat: AlgoChat?
     private(set) var currentAddress: Address?
+    private(set) var currentNetwork: AlgorandConfiguration.Network = .testnet
+    private(set) var currentMnemonic: String?
+
+    // MARK: - Storage
+
+    private let accountStorage = AccountStorage()
 
     // MARK: - Configuration
 
@@ -34,6 +41,8 @@ final class ApplicationState: ObservableObject {
             let chatClient = try await AlgoChat(network: network, account: account)
             self.chat = chatClient
             self.currentAddress = await chatClient.address
+            self.currentNetwork = network
+            self.currentMnemonic = mnemonic
 
             // Load initial data
             await loadConversations()
@@ -48,9 +57,117 @@ final class ApplicationState: ObservableObject {
     func disconnect() {
         chat = nil
         currentAddress = nil
+        currentMnemonic = nil
         conversations = []
         selectedConversation = nil
         accountBalance = nil
+    }
+
+    // MARK: - Saved Accounts
+
+    /// Loads saved accounts from storage (does not trigger biometric)
+    func loadSavedAccounts() async {
+        savedAccounts = await accountStorage.listAccounts()
+    }
+
+    /// Connects using a saved account (triggers biometric authentication)
+    func connectSaved(_ account: SavedAccount) async {
+        isLoading = true
+        error = nil
+
+        do {
+            let mnemonic = try await accountStorage.retrieveMnemonic(for: account)
+            let network: AlgorandConfiguration.Network
+            switch account.network {
+            case "mainnet":
+                network = .mainnet
+            case "localnet":
+                network = .localnet
+            default:
+                network = .testnet
+            }
+
+            let algorandAccount = try Account(mnemonic: mnemonic)
+            let chatClient = try await AlgoChat(network: network, account: algorandAccount)
+
+            self.chat = chatClient
+            self.currentAddress = await chatClient.address
+            self.currentNetwork = network
+            self.currentMnemonic = mnemonic
+
+            // Update last used timestamp
+            await accountStorage.updateLastUsed(for: account.address)
+            await loadSavedAccounts()
+
+            // Load initial data
+            await loadConversations()
+            await refreshBalance()
+        } catch let storageError as AccountStorageError {
+            switch storageError {
+            case .biometricCanceled:
+                // User canceled - don't show error
+                break
+            default:
+                self.error = AppError(message: storageError.localizedDescription)
+            }
+        } catch {
+            self.error = AppError(message: "Failed to connect: \(error.localizedDescription)")
+        }
+
+        isLoading = false
+    }
+
+    /// Saves the current account with biometric protection
+    func saveCurrentAccount(name: String? = nil) async throws {
+        guard let address = currentAddress,
+              let mnemonic = currentMnemonic else {
+            throw AccountStorageError.invalidMnemonic
+        }
+
+        let networkString: String
+        switch currentNetwork {
+        case .mainnet:
+            networkString = "mainnet"
+        case .testnet:
+            networkString = "testnet"
+        case .localnet:
+            networkString = "localnet"
+        case .custom:
+            networkString = "custom"
+        }
+
+        try await accountStorage.save(
+            mnemonic: mnemonic,
+            for: address.description,
+            network: networkString,
+            name: name
+        )
+
+        await loadSavedAccounts()
+    }
+
+    /// Deletes a saved account
+    func deleteSavedAccount(_ account: SavedAccount) async throws {
+        try await accountStorage.delete(for: account)
+        await loadSavedAccounts()
+    }
+
+    /// Updates the display name for a saved account
+    func renameSavedAccount(_ account: SavedAccount, to name: String?) async {
+        await accountStorage.updateName(for: account.address, name: name)
+        await loadSavedAccounts()
+    }
+
+    /// Checks if the current account is saved
+    var isCurrentAccountSaved: Bool {
+        guard let address = currentAddress else { return false }
+        return savedAccounts.contains { $0.address == address.description }
+    }
+
+    /// Gets the saved account for the current address
+    var currentSavedAccount: SavedAccount? {
+        guard let address = currentAddress else { return nil }
+        return savedAccounts.first { $0.address == address.description }
     }
 
     // MARK: - Conversations

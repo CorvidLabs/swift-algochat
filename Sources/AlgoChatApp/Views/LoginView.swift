@@ -20,6 +20,12 @@ struct LoginView: View {
     @State private var selectedNetwork: NetworkSelection = .testnet
     @State private var generatedAddress: String?
     @State private var showCopiedAlert = false
+    @State private var saveAccount = true
+    @State private var accountName = ""
+
+    private var biometricName: String {
+        AccountStorage.biometricType.rawValue
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -100,6 +106,23 @@ struct LoginView: View {
                 }
                 .pickerStyle(.segmented)
 
+                // Save account toggle
+                if generatedAddress != nil {
+                    VStack(spacing: 12) {
+                        Toggle(isOn: $saveAccount) {
+                            Label("Save with \(biometricName)", systemImage: biometricIcon)
+                        }
+
+                        if saveAccount {
+                            TextField("Account nickname (optional)", text: $accountName)
+                                .textFieldStyle(.roundedBorder)
+                                .textContentType(.name)
+                                .autocorrectionDisabled()
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+
                 // Fund on testnet button
                 if selectedNetwork == .testnet, generatedAddress != nil {
                     Button {
@@ -114,7 +137,7 @@ struct LoginView: View {
 
                 Button {
                     Task {
-                        await appState.connect(mnemonic: mnemonic.trimmingCharacters(in: .whitespacesAndNewlines), network: selectedNetwork.network)
+                        await connectAndSave()
                     }
                 } label: {
                     if appState.isLoading {
@@ -160,6 +183,35 @@ struct LoginView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Address copied to clipboard")
+        }
+    }
+
+    private var biometricIcon: String {
+        switch AccountStorage.biometricType {
+        case .faceID:
+            return "faceid"
+        case .touchID:
+            return "touchid"
+        case .opticID:
+            return "opticid"
+        case .none:
+            return "key"
+        }
+    }
+
+    private func connectAndSave() async {
+        let trimmedMnemonic = mnemonic.trimmingCharacters(in: .whitespacesAndNewlines)
+        await appState.connect(mnemonic: trimmedMnemonic, network: selectedNetwork.network)
+
+        // Save account after successful connection if toggle is on
+        if appState.isConnected && saveAccount {
+            do {
+                try await appState.saveCurrentAccount(
+                    name: accountName.isEmpty ? nil : accountName
+                )
+            } catch {
+                // Don't show error - account is connected, just not saved
+            }
         }
     }
 
