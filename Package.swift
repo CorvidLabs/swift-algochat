@@ -2,6 +2,53 @@
 
 import PackageDescription
 
+var targets: [Target] = [
+    .target(
+        name: "AlgoChat",
+        dependencies: [
+            .product(name: "AlgoKit", package: "swift-algokit"),
+            .product(name: "Crypto", package: "swift-crypto")
+        ]
+    ),
+    .executableTarget(
+        name: "AlgoChatCLI",
+        dependencies: [
+            "AlgoChat",
+            .product(name: "CLI", package: "swift-cli")
+        ]
+    ),
+    .testTarget(
+        name: "AlgoChatTests",
+        dependencies: ["AlgoChat"]
+    )
+]
+
+var products: [Product] = [
+    .library(
+        name: "AlgoChat",
+        targets: ["AlgoChat"]
+    ),
+    .executable(
+        name: "algochat",
+        targets: ["AlgoChatCLI"]
+    )
+]
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+targets.append(
+    .executableTarget(
+        name: "AlgoChatApp",
+        dependencies: ["AlgoChat"]
+    )
+)
+products.append(
+    .executable(
+        name: "AlgoChatApp",
+        targets: ["AlgoChatApp"]
+    )
+)
+#endif
+
 let package = Package(
     name: "swift-algochat",
     platforms: [
@@ -11,48 +58,12 @@ let package = Package(
         .watchOS(.v10),
         .visionOS(.v1)
     ],
-    products: [
-        .library(
-            name: "AlgoChat",
-            targets: ["AlgoChat"]
-        ),
-        .executable(
-            name: "algochat",
-            targets: ["AlgoChatCLI"]
-        ),
-        .executable(
-            name: "AlgoChatApp",
-            targets: ["AlgoChatApp"]
-        )
-    ],
+    products: products,
     dependencies: [
         .package(url: "https://github.com/CorvidLabs/swift-algokit.git", from: "0.0.2"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/CorvidLabs/swift-cli.git", from: "0.1.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0")
     ],
-    targets: [
-        .target(
-            name: "AlgoChat",
-            dependencies: [
-                .product(name: "AlgoKit", package: "swift-algokit"),
-                .product(name: "Crypto", package: "swift-crypto")
-            ]
-        ),
-        .executableTarget(
-            name: "AlgoChatCLI",
-            dependencies: [
-                "AlgoChat",
-                .product(name: "CLI", package: "swift-cli")
-            ]
-        ),
-        .testTarget(
-            name: "AlgoChatTests",
-            dependencies: ["AlgoChat"]
-        ),
-        .executableTarget(
-            name: "AlgoChatApp",
-            dependencies: ["AlgoChat"]
-        )
-    ]
+    targets: targets
 )
