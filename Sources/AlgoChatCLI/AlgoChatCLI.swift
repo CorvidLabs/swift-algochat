@@ -17,6 +17,9 @@ struct AlgoChatCLI {
     /// Standard preview display length
     static let previewDisplayLength = 30
 
+    /// Auto-refresh interval in seconds
+    static let autoRefreshInterval: UInt64 = 10
+
     // MARK: - State
 
     /// Shared key storage (Keychain on Apple platforms, file-based on Linux)
@@ -623,7 +626,17 @@ struct AlgoChatCLI {
             conversation.append(msg)
         }
 
+        var autoRefreshEnabled = false
+        var lastRefreshTime = Date()
+
         while true {
+            // Auto-refresh if enabled
+            if autoRefreshEnabled {
+                let currentConv = conversation
+                conversation = (try? await chat.refresh(currentConv)) ?? currentConv
+                lastRefreshTime = Date()
+            }
+
             await terminal.writeLine("")
 
             if conversation.isEmpty {
@@ -631,7 +644,8 @@ struct AlgoChatCLI {
             } else {
                 let shortAddr = truncateAddress(participant.description)
                 let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
-                await terminal.writeLine("═══ Conversation with \(shortAddr.cyan) ═══ \(networkLabel)".bold)
+                let autoLabel = autoRefreshEnabled ? " [Auto-refresh ON]".green : ""
+                await terminal.writeLine("═══ Conversation with \(shortAddr.cyan) ═══ \(networkLabel)\(autoLabel)".bold)
                 await terminal.writeLine("")
 
                 // Display messages with improved formatting
@@ -658,6 +672,10 @@ struct AlgoChatCLI {
 
                     await terminal.writeLine("")
                 }
+
+                // Show last refresh time
+                let refreshAgo = formatRelativeTime(lastRefreshTime)
+                await terminal.writeLine("Last refreshed: \(refreshAgo)".dim)
             }
 
             // Show action menu - use conversation.lastReceived for easy reply
@@ -667,7 +685,12 @@ struct AlgoChatCLI {
                 options.insert("Reply to last message", at: 0)
             }
 
-            options.append(contentsOf: ["Refresh", "Back"])
+            // Toggle auto-refresh option
+            let autoRefreshOption = autoRefreshEnabled
+                ? "⏸ Disable auto-refresh"
+                : "▶ Enable auto-refresh"
+
+            options.append(contentsOf: [autoRefreshOption, "Refresh now", "Back"])
 
             let action = try await terminal.select(
                 "Actions",
@@ -680,14 +703,22 @@ struct AlgoChatCLI {
                     if let sentMessage = try await sendReply(chat: chat, conversation: conversation, replyingTo: original, terminal: terminal) {
                         // Append sent message locally for immediate display
                         conversation.append(sentMessage)
+                        lastRefreshTime = Date()
                     }
                 }
             case "Send new message":
                 if let sentMessage = try await sendMessageTo(chat: chat, conversation: conversation, terminal: terminal) {
                     // Append sent message locally for immediate display
                     conversation.append(sentMessage)
+                    lastRefreshTime = Date()
                 }
-            case "Refresh":
+            case "▶ Enable auto-refresh":
+                autoRefreshEnabled = true
+                await terminal.writeLine("Auto-refresh enabled. Messages will refresh each time you return to this screen.".green)
+            case "⏸ Disable auto-refresh":
+                autoRefreshEnabled = false
+                await terminal.writeLine("Auto-refresh disabled.".yellow)
+            case "Refresh now":
                 let currentConv = conversation
                 conversation = try await terminal.withSpinner(
                     message: "Refreshing",
@@ -695,6 +726,7 @@ struct AlgoChatCLI {
                 ) {
                     try await chat.refresh(currentConv)
                 }
+                lastRefreshTime = Date()
             case "Back":
                 return
             default:
@@ -819,25 +851,55 @@ struct AlgoChatCLI {
     }
 
     static func viewConversations(chat: AlgoChat, terminal: Terminal) async throws {
-        let allConversations = try await terminal.withSpinner(
+        var allConversations = try await terminal.withSpinner(
             message: "Fetching conversations",
             style: .dots
         ) {
             try await chat.conversations()
         }
 
-        await terminal.writeLine("")
-        if allConversations.isEmpty {
-            await terminal.writeLine("No conversations yet.".yellow)
-            await terminal.writeLine("Send a message to start chatting!".dim)
-        } else {
-            try await showConversationList(
+        while true {
+            await terminal.writeLine("")
+            if allConversations.isEmpty {
+                await terminal.writeLine("No conversations yet.".yellow)
+                await terminal.writeLine("Send a message to start chatting!".dim)
+                return
+            }
+
+            let result = try await showConversationList(
                 conversations: allConversations,
                 chat: chat,
                 terminal: terminal,
                 searchTerm: nil
             )
+
+            switch result {
+            case .back:
+                return
+            case .refreshAll:
+                allConversations = try await terminal.withSpinner(
+                    message: "Refreshing all conversations",
+                    style: .dots
+                ) {
+                    try await chat.conversations()
+                }
+                await terminal.writeLine("✅ Conversations refreshed!".green)
+            case .selected:
+                // After viewing a conversation, loop back to show list again
+                allConversations = try await terminal.withSpinner(
+                    message: "Refreshing conversations",
+                    style: .dots
+                ) {
+                    try await chat.conversations()
+                }
+            }
         }
+    }
+
+    enum ConversationListResult {
+        case back
+        case refreshAll
+        case selected
     }
 
     static func showConversationList(
@@ -845,7 +907,7 @@ struct AlgoChatCLI {
         chat: AlgoChat,
         terminal: Terminal,
         searchTerm: String?
-    ) async throws {
+    ) async throws -> ConversationListResult {
         // Filter conversations if search term provided
         let filtered: [Conversation]
         if let term = searchTerm, !term.isEmpty {
@@ -870,12 +932,13 @@ struct AlgoChatCLI {
         // Build options for selection
         var options: [String] = []
 
-        // Add search option
+        // Add search and refresh options
         if searchTerm == nil {
             options.append("🔍 Search by address")
         } else {
             options.append("🔍 Clear search")
         }
+        options.append("🔄 Refresh all")
 
         for conv in filtered {
             let shortAddr = truncateAddress(conv.participant.description)
@@ -896,45 +959,50 @@ struct AlgoChatCLI {
         )
 
         if selection == "Back" {
-            return
+            return .back
+        }
+
+        if selection == "🔄 Refresh all" {
+            return .refreshAll
         }
 
         if selection == "🔍 Search by address" {
             let term = try await terminal.input("Search (address substring)")
             if !term.isEmpty {
-                try await showConversationList(
+                return try await showConversationList(
                     conversations: conversations,
                     chat: chat,
                     terminal: terminal,
                     searchTerm: term
                 )
             } else {
-                try await showConversationList(
+                return try await showConversationList(
                     conversations: conversations,
                     chat: chat,
                     terminal: terminal,
                     searchTerm: nil
                 )
             }
-            return
         }
 
         if selection == "🔍 Clear search" {
-            try await showConversationList(
+            return try await showConversationList(
                 conversations: conversations,
                 chat: chat,
                 terminal: terminal,
                 searchTerm: nil
             )
-            return
         }
 
-        // Find the selected conversation (offset by 1 for search option)
-        let conversationOptions = options.dropFirst().dropLast() // Remove search and Back
+        // Find the selected conversation (offset by 2 for search and refresh options)
+        let conversationOptions = options.dropFirst(2).dropLast() // Remove search, refresh, and Back
         if let index = conversationOptions.firstIndex(of: selection) {
             let conv = filtered[index]
             try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)
+            return .selected
         }
+
+        return .back
     }
 
     // MARK: - Account Info
