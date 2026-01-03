@@ -994,8 +994,8 @@ struct AlgoChatCLI {
             )
         }
 
-        // Find the selected conversation (offset by 2 for search and refresh options)
-        let conversationOptions = options.dropFirst(2).dropLast() // Remove search, refresh, and Back
+        // Find the selected conversation (convert to Array for zero-based indexing)
+        let conversationOptions = Array(options.dropFirst(2).dropLast()) // Remove search, refresh, and Back
         if let index = conversationOptions.firstIndex(of: selection) {
             let conv = filtered[index]
             try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)

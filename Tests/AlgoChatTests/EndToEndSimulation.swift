@@ -350,7 +350,8 @@ struct SecurityBoundaryTests {
         tamperedCiphertext[0] ^= 0x01
         let tampered1 = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: tamperedCiphertext
         )
@@ -366,7 +367,8 @@ struct SecurityBoundaryTests {
         tamperedNonce[0] ^= 0x01
         let tampered2 = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: tamperedNonce,
             ciphertext: envelope.ciphertext
         )
@@ -378,11 +380,12 @@ struct SecurityBoundaryTests {
         #expect(nonceTamperDetected)
 
         // Tamper with ephemeral key
-        var tamperedEphemeral = envelope.ephemeralPublicKey!
+        var tamperedEphemeral = envelope.ephemeralPublicKey
         tamperedEphemeral[0] ^= 0x01
         let tampered3 = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
             ephemeralPublicKey: tamperedEphemeral,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: envelope.ciphertext
         )
@@ -398,7 +401,8 @@ struct SecurityBoundaryTests {
         tamperedSender[0] ^= 0x01
         let tampered4 = ChatEnvelope(
             senderPublicKey: tamperedSender,
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: envelope.ciphertext
         )
@@ -716,7 +720,7 @@ struct LongTermUsageTests {
                 }
 
                 // Track ephemeral keys (should all be unique)
-                ephemeralKeys.insert(envelope.ephemeralPublicKey!)
+                ephemeralKeys.insert(envelope.ephemeralPublicKey)
 
                 _ = await store.store(envelope, from: sender.name, to: recipient.name)
 
@@ -811,104 +815,6 @@ struct LongTermUsageTests {
         print("\nTotal messages: \(count)")
         print("✅ All \(count) messages verified")
         print("✅ Security boundaries enforced for all \(users.count) users")
-    }
-}
-
-// MARK: - V1/V2 Migration Tests
-
-@Suite("E2E: V1/V2 Migration", .serialized)
-struct MigrationTests {
-
-    @Test("Mixed V1 and V2 messages in conversation history")
-    func testMixedVersionConversation() async throws {
-        let alice = SimulatedUser(name: "Alice")
-        let bob = SimulatedUser(name: "Bob")
-
-        print("\n=== MIXED V1/V2 CONVERSATION ===")
-
-        // Simulate 20 V1 messages (legacy)
-        print("Creating 20 legacy V1 messages...")
-        var v1Envelopes: [ChatEnvelope] = []
-
-        for i in 1...20 {
-            // Manually create V1 envelope
-            let sharedSecret = try alice.privateKey.sharedSecretFromKeyAgreement(with: bob.publicKey)
-            let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-                using: SHA256.self,
-                salt: Data("AlgoChat-v1-salt".utf8),
-                sharedInfo: Data("AlgoChat-v1-message".utf8),
-                outputByteCount: 32
-            )
-
-            var nonceBytes = [UInt8](repeating: 0, count: 12)
-            #if canImport(Security)
-            _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-            #else
-            guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
-            }
-            defer { try? urandom.close() }
-            nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-            #endif
-            let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
-
-            let plaintext = "Legacy V1 message #\(i)"
-            let sealedBox = try ChaChaPoly.seal(Data(plaintext.utf8), using: symmetricKey, nonce: nonce)
-
-            let v1Envelope = ChatEnvelope(
-                senderPublicKey: alice.publicKey.rawRepresentation,
-                nonce: Data(nonceBytes),
-                ciphertext: sealedBox.ciphertext + sealedBox.tag
-            )
-            v1Envelopes.append(v1Envelope)
-        }
-
-        // Create 20 V2 messages (forward secrecy)
-        print("Creating 20 new V2 messages...")
-        var v2Envelopes: [ChatEnvelope] = []
-
-        for i in 1...20 {
-            let envelope = try MessageEncryptor.encrypt(
-                message: "New V2 message #\(i)",
-                senderPrivateKey: alice.privateKey,
-                recipientPublicKey: bob.publicKey
-            )
-            v2Envelopes.append(envelope)
-        }
-
-        // Interleave and verify all decrypt correctly
-        print("\nVerifying all 40 messages decrypt correctly...")
-
-        var v1Verified = 0
-        var v2Verified = 0
-
-        for (i, envelope) in v1Envelopes.enumerated() {
-            #expect(envelope.envelopeVersion == ChatEnvelope.versionV1)
-            #expect(!envelope.usesForwardSecrecy)
-
-            let decrypted = try MessageEncryptor.decrypt(
-                envelope: envelope,
-                recipientPrivateKey: bob.privateKey
-            )
-            #expect(decrypted?.text == "Legacy V1 message #\(i + 1)")
-            v1Verified += 1
-        }
-
-        for (i, envelope) in v2Envelopes.enumerated() {
-            #expect(envelope.envelopeVersion == ChatEnvelope.versionV2)
-            #expect(envelope.usesForwardSecrecy)
-
-            let decrypted = try MessageEncryptor.decrypt(
-                envelope: envelope,
-                recipientPrivateKey: bob.privateKey
-            )
-            #expect(decrypted?.text == "New V2 message #\(i + 1)")
-            v2Verified += 1
-        }
-
-        print("V1 messages verified: \(v1Verified)")
-        print("V2 messages verified: \(v2Verified)")
-        print("✅ Mixed V1/V2 conversation fully compatible")
     }
 }
 

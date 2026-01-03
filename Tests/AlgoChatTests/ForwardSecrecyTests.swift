@@ -80,118 +80,84 @@ struct EphemeralKeyManagerTests {
     }
 }
 
-@Suite("ChatEnvelope V2 Tests")
-struct ChatEnvelopeV2Tests {
-    @Test("V2 envelope has correct version")
-    func testV2Version() {
+@Suite("ChatEnvelope Tests")
+struct ChatEnvelopeForwardSecrecyTests {
+    @Test("Envelope has correct version")
+    func testVersion() {
         let envelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0x01, count: 32),
             ephemeralPublicKey: Data(repeating: 0x02, count: 32),
-            nonce: Data(repeating: 0x03, count: 12),
-            ciphertext: Data(repeating: 0x04, count: 50)
+            encryptedSenderKey: Data(repeating: 0x03, count: 48),
+            nonce: Data(repeating: 0x04, count: 12),
+            ciphertext: Data(repeating: 0x05, count: 50)
         )
 
-        #expect(envelope.envelopeVersion == ChatEnvelope.versionV2)
-        #expect(envelope.usesForwardSecrecy == true)
+        #expect(envelope.encode()[0] == ChatEnvelope.version)
     }
 
-    @Test("V1 envelope does not use forward secrecy")
-    func testV1NoForwardSecrecy() {
-        let envelope = ChatEnvelope(
-            senderPublicKey: Data(repeating: 0x01, count: 32),
-            nonce: Data(repeating: 0x02, count: 12),
-            ciphertext: Data(repeating: 0x03, count: 50)
-        )
-
-        #expect(envelope.envelopeVersion == ChatEnvelope.versionV1)
-        #expect(envelope.usesForwardSecrecy == false)
-        #expect(envelope.ephemeralPublicKey == nil)
-    }
-
-    @Test("V2 envelope encodes correctly")
-    func testV2Encode() {
+    @Test("Envelope encodes correctly")
+    func testEncode() {
         let senderKey = Data(repeating: 0x01, count: 32)
         let ephemeralKey = Data(repeating: 0x02, count: 32)
-        let nonce = Data(repeating: 0x03, count: 12)
-        let ciphertext = Data(repeating: 0x04, count: 50)
+        let encryptedSenderKey = Data(repeating: 0x03, count: 48)
+        let nonce = Data(repeating: 0x04, count: 12)
+        let ciphertext = Data(repeating: 0x05, count: 50)
 
         let envelope = ChatEnvelope(
             senderPublicKey: senderKey,
             ephemeralPublicKey: ephemeralKey,
+            encryptedSenderKey: encryptedSenderKey,
             nonce: nonce,
             ciphertext: ciphertext
         )
 
         let encoded = envelope.encode()
 
-        #expect(encoded[0] == ChatEnvelope.versionV2)
+        #expect(encoded[0] == ChatEnvelope.version)
         #expect(encoded[1] == ChatEnvelope.protocolID)
         #expect(Data(encoded[2..<34]) == senderKey)
         #expect(Data(encoded[34..<66]) == ephemeralKey)
         #expect(Data(encoded[66..<78]) == nonce)
-        #expect(Data(encoded[78...]) == ciphertext)
+        #expect(Data(encoded[78..<126]) == encryptedSenderKey)
+        #expect(Data(encoded[126...]) == ciphertext)
     }
 
-    @Test("V2 envelope decode round trip")
-    func testV2DecodeRoundTrip() throws {
+    @Test("Envelope decode round trip")
+    func testDecodeRoundTrip() throws {
         let original = ChatEnvelope(
             senderPublicKey: Data(repeating: 0x01, count: 32),
             ephemeralPublicKey: Data(repeating: 0x02, count: 32),
-            nonce: Data(repeating: 0x03, count: 12),
-            ciphertext: Data(repeating: 0x04, count: 50)
+            encryptedSenderKey: Data(repeating: 0x03, count: 48),
+            nonce: Data(repeating: 0x04, count: 12),
+            ciphertext: Data(repeating: 0x05, count: 50)
         )
 
         let encoded = original.encode()
         let decoded = try ChatEnvelope.decode(from: encoded)
 
-        #expect(decoded.envelopeVersion == original.envelopeVersion)
         #expect(decoded.senderPublicKey == original.senderPublicKey)
         #expect(decoded.ephemeralPublicKey == original.ephemeralPublicKey)
+        #expect(decoded.encryptedSenderKey == original.encryptedSenderKey)
         #expect(decoded.nonce == original.nonce)
         #expect(decoded.ciphertext == original.ciphertext)
     }
 
-    @Test("V1 envelope decode round trip")
-    func testV1DecodeRoundTrip() throws {
-        let original = ChatEnvelope(
-            senderPublicKey: Data(repeating: 0x01, count: 32),
-            nonce: Data(repeating: 0x02, count: 12),
-            ciphertext: Data(repeating: 0x03, count: 50)
-        )
-
-        let encoded = original.encode()
-        let decoded = try ChatEnvelope.decode(from: encoded)
-
-        #expect(decoded.envelopeVersion == ChatEnvelope.versionV1)
-        #expect(decoded.senderPublicKey == original.senderPublicKey)
-        #expect(decoded.ephemeralPublicKey == nil)
-        #expect(decoded.nonce == original.nonce)
-        #expect(decoded.ciphertext == original.ciphertext)
+    @Test("Header size is correct")
+    func testHeaderSize() {
+        // version(1) + protocol(1) + sender(32) + ephemeral(32) + nonce(12) + encryptedSenderKey(48) = 126
+        #expect(ChatEnvelope.headerSize == 126)
     }
 
-    @Test("V2 header size is correct")
-    func testV2HeaderSize() {
-        // V2: version(1) + protocol(1) + sender(32) + ephemeral(32) + nonce(12) = 78
-        #expect(ChatEnvelope.headerSizeV2 == 78)
-    }
-
-    @Test("V1 header size is correct")
-    func testV1HeaderSize() {
-        // V1: version(1) + protocol(1) + sender(32) + nonce(12) = 46
-        #expect(ChatEnvelope.headerSizeV1 == 46)
-    }
-
-    @Test("Max payload sizes are correct")
-    func testMaxPayloadSizes() {
-        // 1024 byte note - header - 16 byte tag
-        #expect(ChatEnvelope.maxPayloadSizeV1 == 962)
-        #expect(ChatEnvelope.maxPayloadSizeV2 == 930)
+    @Test("Max payload size is correct")
+    func testMaxPayloadSize() {
+        // 1024 byte note - 126 byte header - 16 byte tag = 882
+        #expect(ChatEnvelope.maxPayloadSize == 882)
     }
 
     @Test("Decode fails for unsupported version")
     func testDecodeUnsupportedVersion() {
         var data = Data([0x99, ChatEnvelope.protocolID])
-        data.append(Data(repeating: 0x00, count: 100))
+        data.append(Data(repeating: 0x00, count: 200))
 
         #expect(throws: ChatError.self) {
             try ChatEnvelope.decode(from: data)
@@ -200,8 +166,8 @@ struct ChatEnvelopeV2Tests {
 
     @Test("Decode fails for unsupported protocol")
     func testDecodeUnsupportedProtocol() {
-        var data = Data([ChatEnvelope.versionV2, 0x99])
-        data.append(Data(repeating: 0x00, count: 100))
+        var data = Data([ChatEnvelope.version, 0x99])
+        data.append(Data(repeating: 0x00, count: 200))
 
         #expect(throws: ChatError.self) {
             try ChatEnvelope.decode(from: data)
@@ -210,7 +176,7 @@ struct ChatEnvelopeV2Tests {
 
     @Test("Decode fails for data too short")
     func testDecodeDataTooShort() {
-        let data = Data([ChatEnvelope.versionV2])
+        let data = Data([ChatEnvelope.version])
 
         #expect(throws: ChatError.self) {
             try ChatEnvelope.decode(from: data)
@@ -218,10 +184,10 @@ struct ChatEnvelopeV2Tests {
     }
 }
 
-@Suite("V2 Encryption Tests")
-struct V2EncryptionTests {
-    @Test("Encrypt produces V2 envelope")
-    func testEncryptProducesV2Envelope() throws {
+@Suite("Encryption Tests")
+struct EncryptionTests {
+    @Test("Encrypt produces envelope with forward secrecy")
+    func testEncryptProducesEnvelope() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
@@ -231,10 +197,8 @@ struct V2EncryptionTests {
             recipientPublicKey: recipientKey.publicKey
         )
 
-        #expect(envelope.envelopeVersion == ChatEnvelope.versionV2)
-        #expect(envelope.usesForwardSecrecy == true)
-        #expect(envelope.ephemeralPublicKey != nil)
-        #expect(envelope.ephemeralPublicKey?.count == 32)
+        #expect(envelope.ephemeralPublicKey.count == 32)
+        #expect(envelope.encryptedSenderKey.count == 48)
     }
 
     @Test("Ephemeral key differs from sender key")
@@ -271,8 +235,8 @@ struct V2EncryptionTests {
         #expect(envelope1.ephemeralPublicKey != envelope2.ephemeralPublicKey)
     }
 
-    @Test("V2 encrypt and decrypt round trip")
-    func testV2EncryptDecryptRoundTrip() throws {
+    @Test("Recipient can decrypt message")
+    func testRecipientDecryption() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
         let message = "Hello, forward secrecy!"
@@ -291,8 +255,56 @@ struct V2EncryptionTests {
         #expect(decrypted?.text == message)
     }
 
-    @Test("V2 encrypt with reply context")
-    func testV2EncryptWithReply() throws {
+    @Test("Sender can decrypt their own message")
+    func testSenderDecryption() throws {
+        let senderKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+        let message = "Sender should be able to read this!"
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: message,
+            senderPrivateKey: senderKey,
+            recipientPublicKey: recipientKey.publicKey
+        )
+
+        // Sender decrypts their own message using their own private key
+        let decrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: senderKey
+        )
+
+        #expect(decrypted?.text == message)
+    }
+
+    @Test("Both sender and recipient can decrypt")
+    func testBidirectionalDecryption() throws {
+        let senderKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+        let message = "Both parties should read this!"
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: message,
+            senderPrivateKey: senderKey,
+            recipientPublicKey: recipientKey.publicKey
+        )
+
+        // Recipient decrypts
+        let recipientDecrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: recipientKey
+        )
+        #expect(recipientDecrypted?.text == message)
+
+        // Sender decrypts their own message
+        let senderDecrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: senderKey
+        )
+        #expect(senderDecrypted?.text == message)
+    }
+
+    @Test("Encrypt with reply context")
+    func testEncryptWithReply() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
@@ -313,8 +325,8 @@ struct V2EncryptionTests {
         #expect(decrypted?.replyToPreview == "Original message")
     }
 
-    @Test("V2 encryptRaw works correctly")
-    func testV2EncryptRaw() throws {
+    @Test("EncryptRaw works correctly")
+    func testEncryptRaw() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
         let data = Data("Raw data payload".utf8)
@@ -325,8 +337,7 @@ struct V2EncryptionTests {
             recipientPublicKey: recipientKey.publicKey
         )
 
-        #expect(envelope.usesForwardSecrecy == true)
-        #expect(envelope.ephemeralPublicKey != nil)
+        #expect(envelope.ephemeralPublicKey.count == 32)
     }
 
     @Test("Decryption fails with wrong key")
@@ -354,7 +365,7 @@ struct V2EncryptionTests {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // Create a message larger than max payload size (930 bytes)
+        // Create a message larger than max payload size (882 bytes)
         let largeMessage = String(repeating: "A", count: 1000)
 
         #expect(throws: ChatError.self) {
@@ -406,136 +417,6 @@ struct V2EncryptionTests {
     }
 }
 
-@Suite("V1 Backward Compatibility Tests")
-struct V1BackwardCompatibilityTests {
-    @Test("Can decrypt V1 envelope")
-    func testDecryptV1Envelope() throws {
-        // Create a V1-style envelope manually (simulating legacy messages)
-        let senderKey = Curve25519.KeyAgreement.PrivateKey()
-        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
-        let message = "Legacy message"
-
-        // Manually create V1 encryption (static key ECDH)
-        let sharedSecret = try senderKey.sharedSecretFromKeyAgreement(with: recipientKey.publicKey)
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: Data("AlgoChat-v1-salt".utf8),
-            sharedInfo: Data("AlgoChat-v1-message".utf8),
-            outputByteCount: 32
-        )
-
-        var nonceBytes = [UInt8](repeating: 0, count: 12)
-        #if canImport(Security)
-        _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-        #else
-        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
-        }
-        defer { try? urandom.close() }
-        nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-        #endif
-        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
-
-        let sealedBox = try ChaChaPoly.seal(
-            Data(message.utf8),
-            using: symmetricKey,
-            nonce: nonce
-        )
-
-        let v1Envelope = ChatEnvelope(
-            senderPublicKey: senderKey.publicKey.rawRepresentation,
-            nonce: Data(nonceBytes),
-            ciphertext: sealedBox.ciphertext + sealedBox.tag
-        )
-
-        // Decrypt using the library
-        let decrypted = try MessageEncryptor.decrypt(
-            envelope: v1Envelope,
-            recipientPrivateKey: recipientKey
-        )
-
-        #expect(decrypted?.text == message)
-    }
-
-    @Test("V1 and V2 envelopes detected correctly")
-    func testVersionDetection() {
-        let v1Envelope = ChatEnvelope(
-            senderPublicKey: Data(repeating: 0x01, count: 32),
-            nonce: Data(repeating: 0x02, count: 12),
-            ciphertext: Data(repeating: 0x03, count: 50)
-        )
-
-        let v2Envelope = ChatEnvelope(
-            senderPublicKey: Data(repeating: 0x01, count: 32),
-            ephemeralPublicKey: Data(repeating: 0x02, count: 32),
-            nonce: Data(repeating: 0x03, count: 12),
-            ciphertext: Data(repeating: 0x04, count: 50)
-        )
-
-        #expect(v1Envelope.usesForwardSecrecy == false)
-        #expect(v2Envelope.usesForwardSecrecy == true)
-    }
-
-    @Test("Mixed V1 and V2 with same key pair")
-    func testMixedV1V2SameKeyPair() throws {
-        let senderKey = Curve25519.KeyAgreement.PrivateKey()
-        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
-
-        // Create V1 message (static key ECDH)
-        let sharedSecret = try senderKey.sharedSecretFromKeyAgreement(with: recipientKey.publicKey)
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: Data("AlgoChat-v1-salt".utf8),
-            sharedInfo: Data("AlgoChat-v1-message".utf8),
-            outputByteCount: 32
-        )
-
-        var nonceBytes = [UInt8](repeating: 0, count: 12)
-        #if canImport(Security)
-        _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-        #else
-        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
-        }
-        defer { try? urandom.close() }
-        nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-        #endif
-        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
-
-        let sealedBox = try ChaChaPoly.seal(
-            Data("V1 message".utf8),
-            using: symmetricKey,
-            nonce: nonce
-        )
-
-        let v1Envelope = ChatEnvelope(
-            senderPublicKey: senderKey.publicKey.rawRepresentation,
-            nonce: Data(nonceBytes),
-            ciphertext: sealedBox.ciphertext + sealedBox.tag
-        )
-
-        // Create V2 message (ephemeral key ECDH) with SAME sender key
-        let v2Envelope = try MessageEncryptor.encrypt(
-            message: "V2 message",
-            senderPrivateKey: senderKey,
-            recipientPublicKey: recipientKey.publicKey
-        )
-
-        // Decrypt both
-        let decryptedV1 = try MessageEncryptor.decrypt(
-            envelope: v1Envelope,
-            recipientPrivateKey: recipientKey
-        )
-        let decryptedV2 = try MessageEncryptor.decrypt(
-            envelope: v2Envelope,
-            recipientPrivateKey: recipientKey
-        )
-
-        #expect(decryptedV1?.text == "V1 message")
-        #expect(decryptedV2?.text == "V2 message")
-    }
-}
-
 @Suite("Edge Case Tests")
 struct EdgeCaseTests {
     @Test("Tampered ephemeral public key fails decryption")
@@ -550,12 +431,13 @@ struct EdgeCaseTests {
         )
 
         // Tamper with the ephemeral public key
-        var tamperedEphemeralKey = envelope.ephemeralPublicKey!
+        var tamperedEphemeralKey = envelope.ephemeralPublicKey
         tamperedEphemeralKey[0] ^= 0xFF  // Flip bits
 
         let tamperedEnvelope = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
             ephemeralPublicKey: tamperedEphemeralKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: envelope.ciphertext
         )
@@ -577,8 +459,9 @@ struct EdgeCaseTests {
         let envelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0x01, count: 32),
             ephemeralPublicKey: Data(repeating: 0x02, count: 32),
-            nonce: Data(repeating: 0x03, count: 12),
-            ciphertext: Data(repeating: 0x04, count: 10)  // Only 10 bytes, need at least 16
+            encryptedSenderKey: Data(repeating: 0x03, count: 48),
+            nonce: Data(repeating: 0x04, count: 12),
+            ciphertext: Data(repeating: 0x05, count: 10)  // Only 10 bytes, need at least 16
         )
 
         #expect(throws: ChatError.self) {
@@ -589,13 +472,13 @@ struct EdgeCaseTests {
         }
     }
 
-    @Test("Boundary size message at exactly V2 max")
-    func testBoundarySizeV2Max() throws {
+    @Test("Boundary size message at exactly max")
+    func testBoundarySizeMax() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // V2 max payload is 930 bytes
-        let maxMessage = String(repeating: "A", count: 930)
+        // Max payload is 882 bytes
+        let maxMessage = String(repeating: "A", count: ChatEnvelope.maxPayloadSize)
 
         let envelope = try MessageEncryptor.encrypt(
             message: maxMessage,
@@ -611,13 +494,12 @@ struct EdgeCaseTests {
         #expect(decrypted?.text == maxMessage)
     }
 
-    @Test("Boundary size message one byte under V2 max")
+    @Test("Boundary size message one byte under max")
     func testBoundarySizeOneUnderMax() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // One byte under V2 max
-        let message = String(repeating: "B", count: 929)
+        let message = String(repeating: "B", count: ChatEnvelope.maxPayloadSize - 1)
 
         let envelope = try MessageEncryptor.encrypt(
             message: message,
@@ -633,13 +515,12 @@ struct EdgeCaseTests {
         #expect(decrypted?.text == message)
     }
 
-    @Test("Boundary size message one byte over V2 max fails")
+    @Test("Boundary size message one byte over max fails")
     func testBoundarySizeOneOverMax() throws {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // One byte over V2 max (931 bytes)
-        let message = String(repeating: "X", count: 931)
+        let message = String(repeating: "X", count: ChatEnvelope.maxPayloadSize + 1)
 
         #expect(throws: ChatError.self) {
             _ = try MessageEncryptor.encrypt(
@@ -689,7 +570,8 @@ struct EdgeCaseTests {
         // Create envelope with all-zero sender key (invalid point on curve)
         let corruptedEnvelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0x00, count: 32),
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: envelope.ciphertext
         )
@@ -720,7 +602,8 @@ struct EdgeCaseTests {
 
         let tamperedEnvelope = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: tamperedNonce,
             ciphertext: envelope.ciphertext
         )

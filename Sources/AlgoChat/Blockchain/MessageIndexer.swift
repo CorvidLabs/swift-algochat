@@ -137,25 +137,22 @@ public actor MessageIndexer {
     /// Finds a user's encryption public key from their past transactions
     ///
     /// Searches the user's transaction history to find an AlgoChat message
-    /// containing their public key. Prefers V3 envelopes with verified signatures
-    /// to prevent key substitution attacks.
+    /// containing their public key.
     ///
     /// - Parameters:
     ///   - address: The user's Algorand address
     ///   - searchDepth: Number of transactions to search (default: 200)
-    /// - Returns: The discovered key with verification status
+    /// - Returns: The discovered key
     /// - Throws: `ChatError.publicKeyNotFound` if no chat history exists
     public func findPublicKey(
         for address: Address,
         searchDepth: Int = 200
     ) async throws -> DiscoveredKey {
-        // Search with configurable depth
         let response = try await indexerClient.searchTransactions(
             address: address,
             limit: searchDepth
         )
 
-        // First pass: look for V3 envelopes with valid signatures
         for tx in response.transactions {
             guard tx.sender == address.description,
                   let noteData = tx.noteData,
@@ -167,41 +164,8 @@ public actor MessageIndexer {
                 continue
             }
 
-            // V3 envelopes have signatures - verify before trusting
-            if envelope.hasSignature, let signature = envelope.signature {
-                let isValid = try SignatureVerifier.verify(
-                    encryptionPublicKey: envelope.senderPublicKey,
-                    signedBy: address,
-                    signature: signature
-                )
-
-                if isValid {
-                    let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
-                    return DiscoveredKey(publicKey: publicKey, isVerified: true)
-                }
-                // Invalid signature - skip this transaction, try next
-                continue
-            }
-        }
-
-        // Second pass: fall back to V1/V2 envelopes (no signature verification)
-        // This maintains backward compatibility with older clients
-        for tx in response.transactions {
-            guard tx.sender == address.description,
-                  let noteData = tx.noteData,
-                  isChatMessage(noteData) else {
-                continue
-            }
-
-            guard let envelope = try? ChatEnvelope.decode(from: noteData) else {
-                continue
-            }
-
-            // Accept V1/V2 envelopes without signature (legacy compatibility)
-            if !envelope.hasSignature {
-                let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
-                return DiscoveredKey(publicKey: publicKey, isVerified: false)
-            }
+            let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+            return DiscoveredKey(publicKey: publicKey, isVerified: true)
         }
 
         throw ChatError.publicKeyNotFound(address.description)
@@ -266,11 +230,7 @@ public actor MessageIndexer {
 
     private func isChatMessage(_ data: Data) -> Bool {
         guard data.count >= 2 else { return false }
-        let version = data[0]
-        let validVersion = version == ChatEnvelope.versionV1
-            || version == ChatEnvelope.versionV2
-            || version == ChatEnvelope.versionV3
-        return validVersion && data[1] == ChatEnvelope.protocolID
+        return data[0] == ChatEnvelope.version && data[1] == ChatEnvelope.protocolID
     }
 
     private func parseMessage(

@@ -142,6 +142,8 @@ struct ErrorRecoveryTests {
 
         let tamperedEnvelope = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: tamperedCiphertext
         )
@@ -173,6 +175,8 @@ struct ErrorRecoveryTests {
 
         let tamperedEnvelope = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: tamperedNonce,
             ciphertext: envelope.ciphertext
         )

@@ -33,9 +33,9 @@ struct ForwardSecrecyProof {
                 senderPrivateKey: sender,
                 recipientPublicKey: recipient.publicKey
             )
-            ephemeralKeys.append(envelope.ephemeralPublicKey!)
+            ephemeralKeys.append(envelope.ephemeralPublicKey)
 
-            let keyHex = envelope.ephemeralPublicKey!.prefix(8).map { String(format: "%02x", $0) }.joined()
+            let keyHex = envelope.ephemeralPublicKey.prefix(8).map { String(format: "%02x", $0) }.joined()
             print("Message \(i) ephemeral key: \(keyHex)...")
         }
 
@@ -117,9 +117,9 @@ struct ForwardSecrecyProof {
         )
 
         print("\n--- ENCRYPTED ENVELOPE ---")
-        print("Version:            0x\(String(format: "%02x", envelope.envelopeVersion)) (V2 = forward secrecy)")
+        print("Version:            0x\(String(format: "%02x", ChatEnvelope.version)) (forward secrecy + bidirectional)")
         print("Sender static key:  \(envelope.senderPublicKey.prefix(8).hexString)...")
-        print("Ephemeral key:      \(envelope.ephemeralPublicKey!.prefix(8).hexString)...")
+        print("Ephemeral key:      \(envelope.ephemeralPublicKey.prefix(8).hexString)...")
         print("Nonce:              \(envelope.nonce.hexString)")
         print("Ciphertext:         \(envelope.ciphertext.prefix(16).hexString)... (\(envelope.ciphertext.count) bytes)")
 
@@ -165,7 +165,8 @@ struct ForwardSecrecyProof {
 
         let tamperedEnvelope = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
-            ephemeralPublicKey: envelope.ephemeralPublicKey!,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            encryptedSenderKey: envelope.encryptedSenderKey,
             nonce: envelope.nonce,
             ciphertext: tamperedCiphertext
         )
@@ -206,7 +207,7 @@ struct ForwardSecrecyProof {
         )
 
         print("Message encrypted with ephemeral key")
-        print("Ephemeral public key in envelope: \(envelope.ephemeralPublicKey!.prefix(8).hexString)...")
+        print("Ephemeral public key in envelope: \(envelope.ephemeralPublicKey.prefix(8).hexString)...")
 
         // Simulate attacker who has:
         // 1. The sender's LONG-TERM private key (compromised!)
@@ -262,69 +263,7 @@ struct ForwardSecrecyProof {
         #expect(decrypted?.text == "This message has forward secrecy")
     }
 
-    // MARK: - PROOF 6: Backward Compatibility
-
-    @Test("PROOF 6: V1 legacy messages still decrypt correctly")
-    func proof6_backwardCompatibility() throws {
-        print("\n" + String(repeating: "=", count: 70))
-        print("PROOF 6: BACKWARD COMPATIBILITY (V1)")
-        print(String(repeating: "=", count: 70))
-
-        let sender = Curve25519.KeyAgreement.PrivateKey()
-        let recipient = Curve25519.KeyAgreement.PrivateKey()
-
-        // Manually create a V1 envelope (simulating legacy message)
-        let sharedSecret = try sender.sharedSecretFromKeyAgreement(with: recipient.publicKey)
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: Data("AlgoChat-v1-salt".utf8),
-            sharedInfo: Data("AlgoChat-v1-message".utf8),
-            outputByteCount: 32
-        )
-
-        var nonceBytes = [UInt8](repeating: 0, count: 12)
-        #if canImport(Security)
-        _ = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-        #else
-        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to open /dev/urandom"])
-        }
-        defer { try? urandom.close() }
-        nonceBytes = [UInt8](urandom.readData(ofLength: 12))
-        #endif
-        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
-
-        let legacyMessage = "Legacy V1 message from old client"
-        let sealedBox = try ChaChaPoly.seal(
-            Data(legacyMessage.utf8),
-            using: symmetricKey,
-            nonce: nonce
-        )
-
-        let v1Envelope = ChatEnvelope(
-            senderPublicKey: sender.publicKey.rawRepresentation,
-            nonce: Data(nonceBytes),
-            ciphertext: sealedBox.ciphertext + sealedBox.tag
-        )
-
-        print("V1 Envelope created:")
-        print("  Version: 0x\(String(format: "%02x", v1Envelope.envelopeVersion)) (V1 = static keys)")
-        print("  Ephemeral key: \(v1Envelope.ephemeralPublicKey == nil ? "NONE (V1)" : "present")")
-        print("  Uses forward secrecy: \(v1Envelope.usesForwardSecrecy)")
-
-        // Decrypt using current library
-        let decrypted = try MessageEncryptor.decrypt(
-            envelope: v1Envelope,
-            recipientPrivateKey: recipient
-        )
-
-        print("\nV1 decryption: ✅ \"\(decrypted!.text)\"")
-        print("✅ PROOF: Legacy V1 messages decrypt correctly with new code")
-
-        #expect(decrypted?.text == legacyMessage)
-    }
-
-    // MARK: - PROOF 7: Nonce Security
+    // MARK: - PROOF 6: Nonce Security
 
     @Test("PROOF 7: Secure random nonce generation")
     func proof7_nonceGeneration() throws {

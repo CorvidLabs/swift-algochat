@@ -7,41 +7,29 @@ import Security
 
 /// Encrypts and decrypts chat messages using ChaCha20-Poly1305
 ///
-/// Supports two encryption modes:
-/// - **V1 (Legacy)**: Static key ECDH - uses sender's static key for key agreement
-/// - **V2 (Ephemeral Keys)**: Ephemeral key ECDH - generates fresh key per message
-///
-/// V2 provides sender-side forward secrecy: compromising the sender's long-term key
-/// does not reveal past messages since ephemeral keys are never stored. However,
-/// if the recipient's key is compromised, past messages can be decrypted.
+/// Uses ephemeral key ECDH with bidirectional decryption:
+/// - Generates fresh key pair per message for forward secrecy
+/// - Encrypts symmetric key for sender, allowing sender to decrypt sent messages
+/// - Both sender and recipient can decrypt the message
 public enum MessageEncryptor {
-    // MARK: - V1 Constants (Legacy)
+    // MARK: - Components
 
-    /// Salt for V1 HKDF key derivation
-    private static let hkdfSaltV1 = Data("AlgoChat-v1-salt".utf8)
-
-    /// Shared info for V1 HKDF key derivation
-    private static let sharedInfoV1 = Data("AlgoChat-v1-message".utf8)
-
-    // MARK: - V2 Components
-
-    /// Ephemeral key manager for V2 encryption
+    /// Ephemeral key manager for encryption
     private static let ephemeralKeyManager = EphemeralKeyManager()
 
-    // MARK: - Encryption (V2 - Ephemeral Keys)
+    // MARK: - Encryption
 
     /// Encrypts a message for a recipient using ephemeral key agreement
     ///
     /// Uses ephemeral key agreement: a fresh key pair is generated for each message,
-    /// providing sender-side forward secrecy. If the sender's key is compromised,
-    /// past messages remain secure. Note: recipient key compromise exposes all
-    /// messages encrypted to that recipient.
+    /// providing sender-side forward secrecy. The envelope also includes an encrypted
+    /// copy of the symmetric key for the sender, enabling bidirectional decryption.
     ///
     /// - Parameters:
     ///   - message: The plaintext message
     ///   - senderPrivateKey: Sender's static X25519 private key
     ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data with V2 format
+    /// - Returns: ChatEnvelope containing encrypted data
     public static func encrypt(
         message: String,
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
@@ -50,7 +38,7 @@ public enum MessageEncryptor {
         guard let messageData = message.data(using: .utf8) else {
             throw ChatError.encodingFailed("Failed to encode message as UTF-8")
         }
-        return try encryptDataV2(
+        return try encryptData(
             messageData,
             senderPrivateKey: senderPrivateKey,
             recipientPublicKey: recipientPublicKey
@@ -67,7 +55,7 @@ public enum MessageEncryptor {
     ///   - replyTo: Tuple of original transaction ID and preview text
     ///   - senderPrivateKey: Sender's X25519 private key
     ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data with V2 format
+    /// - Returns: ChatEnvelope containing encrypted data
     public static func encrypt(
         message: String,
         replyTo: (txid: String, preview: String),
@@ -84,7 +72,7 @@ public enum MessageEncryptor {
         encoder.outputFormatting = .sortedKeys
         let payloadData = try encoder.encode(payload)
 
-        return try encryptDataV2(
+        return try encryptData(
             payloadData,
             senderPrivateKey: senderPrivateKey,
             recipientPublicKey: recipientPublicKey
@@ -99,57 +87,31 @@ public enum MessageEncryptor {
     ///   - data: The raw data to encrypt
     ///   - senderPrivateKey: Sender's X25519 private key
     ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data with V2 format
+    /// - Returns: ChatEnvelope containing encrypted data
     public static func encryptRaw(
         _ data: Data,
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey
     ) throws -> ChatEnvelope {
-        try encryptDataV2(data, senderPrivateKey: senderPrivateKey, recipientPublicKey: recipientPublicKey)
+        try encryptData(data, senderPrivateKey: senderPrivateKey, recipientPublicKey: recipientPublicKey)
     }
 
-    /// Encrypts raw data with a signed V3 envelope for key publication
-    ///
-    /// Creates a V3 envelope that includes an Ed25519 signature proving the sender
-    /// owns the encryption key. Used for key publication transactions where recipients
-    /// need to verify key authenticity.
-    ///
-    /// - Parameters:
-    ///   - data: The raw data to encrypt
-    ///   - senderPrivateKey: Sender's X25519 private key
-    ///   - recipientPublicKey: Recipient's X25519 public key
-    ///   - signature: Ed25519 signature of the sender's static public key (64 bytes)
-    /// - Returns: ChatEnvelope containing encrypted data with V3 format (signed)
-    public static func encryptWithSignature(
-        _ data: Data,
-        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
-        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
-        signature: Data
-    ) throws -> ChatEnvelope {
-        try encryptDataV3(
-            data,
-            senderPrivateKey: senderPrivateKey,
-            recipientPublicKey: recipientPublicKey,
-            signature: signature
-        )
-    }
+    // MARK: - Internal Encryption
 
-    // MARK: - V2 Encryption (Forward Secrecy)
-
-    /// Internal method to encrypt raw data with V2 format (ephemeral keys)
-    private static func encryptDataV2(
+    /// Internal method to encrypt raw data with bidirectional decryption support
+    private static func encryptData(
         _ data: Data,
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
         recipientPublicKey: Curve25519.KeyAgreement.PublicKey
     ) throws -> ChatEnvelope {
-        guard data.count <= ChatEnvelope.maxPayloadSizeV2 else {
-            throw ChatError.messageTooLarge(maxSize: ChatEnvelope.maxPayloadSizeV2)
+        guard data.count <= ChatEnvelope.maxPayloadSize else {
+            throw ChatError.messageTooLarge(maxSize: ChatEnvelope.maxPayloadSize)
         }
 
         // Generate ephemeral key pair for this message
         let ephemeralPrivateKey = ephemeralKeyManager.generateKeyPair()
 
-        // Derive symmetric key using ephemeral ECDH
+        // Derive symmetric key for recipient using ephemeral ECDH
         let symmetricKey = try ephemeralKeyManager.deriveEncryptionKey(
             ephemeralPrivateKey: ephemeralPrivateKey,
             recipientPublicKey: recipientPublicKey,
@@ -157,141 +119,93 @@ public enum MessageEncryptor {
         )
 
         // Generate random nonce (12 bytes for ChaCha20-Poly1305)
-        var nonceBytes = [UInt8](repeating: 0, count: 12)
-        #if canImport(Security)
-        let status = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-        guard status == errSecSuccess else {
-            throw ChatError.randomGenerationFailed
-        }
-        #else
-        // Linux: use /dev/urandom which is cryptographically secure
-        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            throw ChatError.randomGenerationFailed
-        }
-        defer { try? urandom.close() }
-        let randomData = urandom.readData(ofLength: 12)
-        guard randomData.count == 12 else {
-            throw ChatError.randomGenerationFailed
-        }
-        nonceBytes = [UInt8](randomData)
-        #endif
+        let nonceBytes = try generateRandomBytes(count: 12)
         let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
 
-        // Encrypt with ChaCha20-Poly1305
+        // Encrypt message with ChaCha20-Poly1305
         let sealedBox = try ChaChaPoly.seal(
             data,
             using: symmetricKey,
             nonce: nonce
         )
-
-        // Combine ciphertext and tag
         let ciphertextWithTag = sealedBox.ciphertext + sealedBox.tag
 
-        return ChatEnvelope(
-            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation,
-            ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
-            nonce: Data(nonceBytes),
-            ciphertext: ciphertextWithTag
-        )
-    }
-
-    // MARK: - V3 Encryption (Forward Secrecy + Signature)
-
-    /// Internal method to encrypt raw data with V3 format (ephemeral keys + signature)
-    private static func encryptDataV3(
-        _ data: Data,
-        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
-        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
-        signature: Data
-    ) throws -> ChatEnvelope {
-        guard data.count <= ChatEnvelope.maxPayloadSizeV3 else {
-            throw ChatError.messageTooLarge(maxSize: ChatEnvelope.maxPayloadSizeV3)
-        }
-
-        guard signature.count == ChatEnvelope.signatureSize else {
-            throw ChatError.invalidSignature(
-                "Signature must be \(ChatEnvelope.signatureSize) bytes, got \(signature.count)"
-            )
-        }
-
-        // Generate ephemeral key pair for this message
-        let ephemeralPrivateKey = ephemeralKeyManager.generateKeyPair()
-
-        // Derive symmetric key using ephemeral ECDH
-        let symmetricKey = try ephemeralKeyManager.deriveEncryptionKey(
-            ephemeralPrivateKey: ephemeralPrivateKey,
-            recipientPublicKey: recipientPublicKey,
-            senderStaticPublicKey: senderPrivateKey.publicKey
+        // Encrypt the symmetric key for the sender (bidirectional decryption)
+        // Derive a sender key using: ephemeral_private * sender_public
+        let senderSharedSecret = try ephemeralPrivateKey.sharedSecretFromKeyAgreement(
+            with: senderPrivateKey.publicKey
         )
 
-        // Generate random nonce (12 bytes for ChaCha20-Poly1305)
-        var nonceBytes = [UInt8](repeating: 0, count: 12)
-        #if canImport(Security)
-        let status = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
-        guard status == errSecSuccess else {
-            throw ChatError.randomGenerationFailed
-        }
-        #else
-        // Linux: use /dev/urandom which is cryptographically secure
-        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            throw ChatError.randomGenerationFailed
-        }
-        defer { try? urandom.close() }
-        let randomData = urandom.readData(ofLength: 12)
-        guard randomData.count == 12 else {
-            throw ChatError.randomGenerationFailed
-        }
-        nonceBytes = [UInt8](randomData)
-        #endif
-        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
+        // Derive symmetric key for encrypting the main symmetric key
+        var senderKeyInfo = Data("AlgoChatV4-SenderKey".utf8)
+        senderKeyInfo.append(senderPrivateKey.publicKey.rawRepresentation)
+        let senderEncryptionKey = senderSharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: ephemeralPrivateKey.publicKey.rawRepresentation,
+            sharedInfo: senderKeyInfo,
+            outputByteCount: 32
+        )
 
-        // Encrypt with ChaCha20-Poly1305
-        let sealedBox = try ChaChaPoly.seal(
-            data,
-            using: symmetricKey,
+        // Encrypt the raw symmetric key bytes for the sender (reuse same nonce, different key is safe)
+        let symmetricKeyData = symmetricKey.withUnsafeBytes { Data($0) }
+        let senderSealedBox = try ChaChaPoly.seal(
+            symmetricKeyData,
+            using: senderEncryptionKey,
             nonce: nonce
         )
-
-        // Combine ciphertext and tag
-        let ciphertextWithTag = sealedBox.ciphertext + sealedBox.tag
+        let encryptedSenderKey = senderSealedBox.ciphertext + senderSealedBox.tag
 
         return ChatEnvelope(
             senderPublicKey: senderPrivateKey.publicKey.rawRepresentation,
             ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
-            signature: signature,
+            encryptedSenderKey: encryptedSenderKey,
             nonce: Data(nonceBytes),
             ciphertext: ciphertextWithTag
         )
     }
 
-    // MARK: - Decryption (Supports V1, V2, and V3)
+    // MARK: - Decryption
 
     /// Decrypts a message envelope and returns structured content
     ///
-    /// Automatically detects and handles both V1 (legacy) and V2 (forward secrecy)
-    /// envelopes. Returns nil for key-publish payloads.
+    /// Automatically detects whether the caller is the sender or recipient
+    /// and uses the appropriate decryption path. Returns nil for key-publish payloads.
     ///
     /// - Parameters:
     ///   - envelope: The encrypted envelope
-    ///   - recipientPrivateKey: Recipient's X25519 private key
+    ///   - recipientPrivateKey: The decryptor's X25519 private key (sender or recipient)
     /// - Returns: DecryptedContent with text and optional reply metadata, or nil for key-publish
     public static func decrypt(
         envelope: ChatEnvelope,
         recipientPrivateKey: Curve25519.KeyAgreement.PrivateKey
     ) throws -> DecryptedContent? {
-        let plaintext: Data
+        // Reconstruct keys
+        let senderStaticPublicKey = try Curve25519.KeyAgreement.PublicKey(
+            rawRepresentation: envelope.senderPublicKey
+        )
+        let ephemeralPublicKey = try Curve25519.KeyAgreement.PublicKey(
+            rawRepresentation: envelope.ephemeralPublicKey
+        )
 
-        // Route to appropriate decryption based on envelope version
-        if envelope.usesForwardSecrecy {
-            plaintext = try decryptDataV2(
+        // Check if we're the sender (our public key matches the envelope's sender public key)
+        let weAreTheSender = recipientPrivateKey.publicKey.rawRepresentation == envelope.senderPublicKey
+
+        let plaintext: Data
+        if weAreTheSender {
+            // Sender decryption: use the encrypted sender key
+            plaintext = try decryptAsSender(
                 envelope: envelope,
-                recipientPrivateKey: recipientPrivateKey
+                senderPrivateKey: recipientPrivateKey,
+                ephemeralPublicKey: ephemeralPublicKey
             )
         } else {
-            plaintext = try decryptDataV1(
-                envelope: envelope,
-                recipientPrivateKey: recipientPrivateKey
+            // Recipient decryption: use ephemeral ECDH
+            let symmetricKey = try ephemeralKeyManager.deriveDecryptionKey(
+                recipientPrivateKey: recipientPrivateKey,
+                ephemeralPublicKey: ephemeralPublicKey,
+                senderStaticPublicKey: senderStaticPublicKey
             )
+            plaintext = try decryptWithKey(envelope: envelope, symmetricKey: symmetricKey)
         }
 
         // Check for key-publish payload (should be filtered from message list)
@@ -317,60 +231,47 @@ public enum MessageEncryptor {
         return DecryptedContent(text: message)
     }
 
-    // MARK: - V1 Decryption (Legacy)
+    // MARK: - Sender Decryption
 
-    /// Decrypts a V1 envelope using static key ECDH
-    private static func decryptDataV1(
+    /// Decrypts an envelope as the sender using the encrypted sender key
+    private static func decryptAsSender(
         envelope: ChatEnvelope,
-        recipientPrivateKey: Curve25519.KeyAgreement.PrivateKey
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        ephemeralPublicKey: Curve25519.KeyAgreement.PublicKey
     ) throws -> Data {
-        // Reconstruct sender's public key
-        let senderPublicKey = try Curve25519.KeyAgreement.PublicKey(
-            rawRepresentation: envelope.senderPublicKey
+        // Derive the sender decryption key: sender_private * ephemeral_public
+        let senderSharedSecret = try senderPrivateKey.sharedSecretFromKeyAgreement(
+            with: ephemeralPublicKey
         )
 
-        // Derive shared secret using static keys
-        let sharedSecret = try recipientPrivateKey.sharedSecretFromKeyAgreement(
-            with: senderPublicKey
-        )
-
-        // Derive symmetric key
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
+        // Derive the key used to encrypt the symmetric key
+        var senderKeyInfo = Data("AlgoChatV4-SenderKey".utf8)
+        senderKeyInfo.append(senderPrivateKey.publicKey.rawRepresentation)
+        let senderDecryptionKey = senderSharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
-            salt: hkdfSaltV1,
-            sharedInfo: sharedInfoV1,
+            salt: ephemeralPublicKey.rawRepresentation,
+            sharedInfo: senderKeyInfo,
             outputByteCount: 32
         )
 
-        return try decryptWithKey(envelope: envelope, symmetricKey: symmetricKey)
-    }
-
-    // MARK: - V2 Decryption (Forward Secrecy)
-
-    /// Decrypts a V2 envelope using ephemeral key ECDH
-    private static func decryptDataV2(
-        envelope: ChatEnvelope,
-        recipientPrivateKey: Curve25519.KeyAgreement.PrivateKey
-    ) throws -> Data {
-        guard let ephemeralKeyData = envelope.ephemeralPublicKey else {
-            throw ChatError.decryptionFailed("V2 envelope missing ephemeral key")
+        // Decrypt the symmetric key
+        let keyNonce = try ChaChaPoly.Nonce(data: envelope.nonce)
+        let keyCiphertextLength = envelope.encryptedSenderKey.count - ChatEnvelope.tagSize
+        guard keyCiphertextLength == 32 else {
+            throw ChatError.decryptionFailed("Invalid encrypted sender key length")
         }
+        let keyCiphertext = envelope.encryptedSenderKey.prefix(keyCiphertextLength)
+        let keyTag = envelope.encryptedSenderKey.suffix(ChatEnvelope.tagSize)
 
-        // Reconstruct keys
-        let senderStaticPublicKey = try Curve25519.KeyAgreement.PublicKey(
-            rawRepresentation: envelope.senderPublicKey
+        let keySealedBox = try ChaChaPoly.SealedBox(
+            nonce: keyNonce,
+            ciphertext: keyCiphertext,
+            tag: keyTag
         )
-        let ephemeralPublicKey = try Curve25519.KeyAgreement.PublicKey(
-            rawRepresentation: ephemeralKeyData
-        )
+        let symmetricKeyData = try ChaChaPoly.open(keySealedBox, using: senderDecryptionKey)
 
-        // Derive symmetric key using ephemeral ECDH
-        let symmetricKey = try ephemeralKeyManager.deriveDecryptionKey(
-            recipientPrivateKey: recipientPrivateKey,
-            ephemeralPublicKey: ephemeralPublicKey,
-            senderStaticPublicKey: senderStaticPublicKey
-        )
-
+        // Use the recovered symmetric key to decrypt the message
+        let symmetricKey = SymmetricKey(data: symmetricKeyData)
         return try decryptWithKey(envelope: envelope, symmetricKey: symmetricKey)
     }
 
@@ -399,5 +300,30 @@ public enum MessageEncryptor {
         )
 
         return try ChaChaPoly.open(sealedBox, using: symmetricKey)
+    }
+
+    // MARK: - Helpers
+
+    /// Generates cryptographically secure random bytes
+    private static func generateRandomBytes(count: Int) throws -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: count)
+        #if canImport(Security)
+        let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        guard status == errSecSuccess else {
+            throw ChatError.randomGenerationFailed
+        }
+        #else
+        // Linux: use /dev/urandom which is cryptographically secure
+        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+            throw ChatError.randomGenerationFailed
+        }
+        defer { try? urandom.close() }
+        let randomData = urandom.readData(ofLength: count)
+        guard randomData.count == count else {
+            throw ChatError.randomGenerationFailed
+        }
+        bytes = [UInt8](randomData)
+        #endif
+        return bytes
     }
 }

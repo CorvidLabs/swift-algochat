@@ -240,7 +240,7 @@ public actor AlgoChat {
     ) async throws -> SendResult {
         // Validate message size before encryption
         let messageBytes = Data(message.utf8)
-        let maxSize = ChatEnvelope.maxPayloadSizeV2
+        let maxSize = ChatEnvelope.maxPayloadSize
         if messageBytes.count > maxSize {
             throw ChatError.messageTooLarge(maxSize: maxSize)
         }
@@ -407,18 +407,11 @@ public actor AlgoChat {
         let payload = KeyPublishPayload()
         let payloadData = try JSONEncoder().encode(payload)
 
-        // Sign the encryption public key with Ed25519 to prove ownership
-        let signature = try SignatureVerifier.sign(
-            encryptionPublicKey: account.publicKeyData,
-            with: account.account
-        )
-
-        // Encrypt with our own key (self-encryption), using V3 signed envelope
-        let envelope = try MessageEncryptor.encryptWithSignature(
+        // Encrypt with our own key (self-encryption)
+        let envelope = try MessageEncryptor.encryptRaw(
             payloadData,
             senderPrivateKey: account.encryptionPrivateKey,
-            recipientPublicKey: account.encryptionPublicKey,
-            signature: signature
+            recipientPublicKey: account.encryptionPublicKey
         )
 
         // Get transaction parameters

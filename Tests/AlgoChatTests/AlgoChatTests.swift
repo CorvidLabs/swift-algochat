@@ -8,11 +8,15 @@ struct ChatEnvelopeTests {
     @Test("Envelope encodes and decodes correctly")
     func testEnvelopeEncodeDecode() throws {
         let senderKey = Data(repeating: 0x01, count: 32)
-        let nonce = Data(repeating: 0x02, count: 12)
-        let ciphertext = Data(repeating: 0x03, count: 50)
+        let ephemeralKey = Data(repeating: 0x02, count: 32)
+        let encryptedSenderKey = Data(repeating: 0x03, count: 48)
+        let nonce = Data(repeating: 0x04, count: 12)
+        let ciphertext = Data(repeating: 0x05, count: 50)
 
         let envelope = ChatEnvelope(
             senderPublicKey: senderKey,
+            ephemeralPublicKey: ephemeralKey,
+            encryptedSenderKey: encryptedSenderKey,
             nonce: nonce,
             ciphertext: ciphertext
         )
@@ -21,16 +25,18 @@ struct ChatEnvelopeTests {
         let decoded = try ChatEnvelope.decode(from: encoded)
 
         #expect(decoded.senderPublicKey == senderKey)
+        #expect(decoded.ephemeralPublicKey == ephemeralKey)
+        #expect(decoded.encryptedSenderKey == encryptedSenderKey)
         #expect(decoded.nonce == nonce)
         #expect(decoded.ciphertext == ciphertext)
     }
 
     @Test("Envelope includes version and protocol bytes")
     func testEnvelopeHeader() throws {
-        // Create V2 envelope (current default)
         let envelope = ChatEnvelope(
             senderPublicKey: Data(repeating: 0, count: 32),
             ephemeralPublicKey: Data(repeating: 0, count: 32),
+            encryptedSenderKey: Data(repeating: 0, count: 48),
             nonce: Data(repeating: 0, count: 12),
             ciphertext: Data(repeating: 0, count: 20)
         )
