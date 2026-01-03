@@ -108,6 +108,32 @@ public enum MessageEncryptor {
         try encryptDataV2(data, senderPrivateKey: senderPrivateKey, recipientPublicKey: recipientPublicKey)
     }
 
+    /// Encrypts raw data with a signed V3 envelope for key publication
+    ///
+    /// Creates a V3 envelope that includes an Ed25519 signature proving the sender
+    /// owns the encryption key. Used for key publication transactions where recipients
+    /// need to verify key authenticity.
+    ///
+    /// - Parameters:
+    ///   - data: The raw data to encrypt
+    ///   - senderPrivateKey: Sender's X25519 private key
+    ///   - recipientPublicKey: Recipient's X25519 public key
+    ///   - signature: Ed25519 signature of the sender's static public key (64 bytes)
+    /// - Returns: ChatEnvelope containing encrypted data with V3 format (signed)
+    public static func encryptWithSignature(
+        _ data: Data,
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
+        signature: Data
+    ) throws -> ChatEnvelope {
+        try encryptDataV3(
+            data,
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPublicKey,
+            signature: signature
+        )
+    }
+
     // MARK: - V2 Encryption (Forward Secrecy)
 
     /// Internal method to encrypt raw data with V2 format (ephemeral keys)
@@ -169,7 +195,76 @@ public enum MessageEncryptor {
         )
     }
 
-    // MARK: - Decryption (Supports V1 and V2)
+    // MARK: - V3 Encryption (Forward Secrecy + Signature)
+
+    /// Internal method to encrypt raw data with V3 format (ephemeral keys + signature)
+    private static func encryptDataV3(
+        _ data: Data,
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
+        signature: Data
+    ) throws -> ChatEnvelope {
+        guard data.count <= ChatEnvelope.maxPayloadSizeV3 else {
+            throw ChatError.messageTooLarge(maxSize: ChatEnvelope.maxPayloadSizeV3)
+        }
+
+        guard signature.count == ChatEnvelope.signatureSize else {
+            throw ChatError.invalidSignature(
+                "Signature must be \(ChatEnvelope.signatureSize) bytes, got \(signature.count)"
+            )
+        }
+
+        // Generate ephemeral key pair for this message
+        let ephemeralPrivateKey = ephemeralKeyManager.generateKeyPair()
+
+        // Derive symmetric key using ephemeral ECDH
+        let symmetricKey = try ephemeralKeyManager.deriveEncryptionKey(
+            ephemeralPrivateKey: ephemeralPrivateKey,
+            recipientPublicKey: recipientPublicKey,
+            senderStaticPublicKey: senderPrivateKey.publicKey
+        )
+
+        // Generate random nonce (12 bytes for ChaCha20-Poly1305)
+        var nonceBytes = [UInt8](repeating: 0, count: 12)
+        #if canImport(Security)
+        let status = SecRandomCopyBytes(kSecRandomDefault, 12, &nonceBytes)
+        guard status == errSecSuccess else {
+            throw ChatError.randomGenerationFailed
+        }
+        #else
+        // Linux: use /dev/urandom which is cryptographically secure
+        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+            throw ChatError.randomGenerationFailed
+        }
+        defer { try? urandom.close() }
+        let randomData = urandom.readData(ofLength: 12)
+        guard randomData.count == 12 else {
+            throw ChatError.randomGenerationFailed
+        }
+        nonceBytes = [UInt8](randomData)
+        #endif
+        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
+
+        // Encrypt with ChaCha20-Poly1305
+        let sealedBox = try ChaChaPoly.seal(
+            data,
+            using: symmetricKey,
+            nonce: nonce
+        )
+
+        // Combine ciphertext and tag
+        let ciphertextWithTag = sealedBox.ciphertext + sealedBox.tag
+
+        return ChatEnvelope(
+            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation,
+            ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
+            signature: signature,
+            nonce: Data(nonceBytes),
+            ciphertext: ciphertextWithTag
+        )
+    }
+
+    // MARK: - Decryption (Supports V1, V2, and V3)
 
     /// Decrypts a message envelope and returns structured content
     ///

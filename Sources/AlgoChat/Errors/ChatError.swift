@@ -22,6 +22,9 @@ public enum ChatError: Error, Sendable {
     /// Could not derive encryption keys
     case keyDerivationFailed(String)
 
+    /// Signature verification failed
+    case invalidSignature(String)
+
     // MARK: - Envelope Errors
 
     /// Invalid message envelope format
@@ -68,6 +71,8 @@ extension ChatError: LocalizedError {
             "Invalid public key: \(reason)"
         case .keyDerivationFailed(let reason):
             "Failed to derive encryption keys: \(reason)"
+        case .invalidSignature(let reason):
+            "Signature verification failed: \(reason)"
         case .invalidEnvelope(let reason):
             "Invalid message envelope: \(reason)"
         case .unsupportedVersion(let version):

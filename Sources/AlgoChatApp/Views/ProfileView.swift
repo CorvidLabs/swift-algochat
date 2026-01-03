@@ -1,12 +1,17 @@
 import AlgoChat
+import Algorand
 import SwiftUI
 
 struct ProfileView: View {
     let address: String
     @EnvironmentObject private var contactsStore: ContactsStore
+    @EnvironmentObject private var appState: ApplicationState
     @Environment(\.dismiss) private var dismiss
     @State private var editedName: String = ""
     @State private var showCopied = false
+    @State private var keyFingerprint: String?
+    @State private var isKeyVerified: Bool = false
+    @State private var isLoadingKey = false
 
     private var contact: Contact? {
         contactsStore.contact(for: address)
@@ -60,6 +65,45 @@ struct ProfileView: View {
                 }
 
                 Section {
+                    if isLoadingKey {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading key...")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let fingerprint = keyFingerprint {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(fingerprint)
+                                .font(.system(.body, design: .monospaced))
+                                .textSelection(.enabled)
+
+                            if isKeyVerified {
+                                Label("Verified", systemImage: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else {
+                                Label("Unverified (legacy key)", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    } else {
+                        Text("No encryption key found")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Encryption Key")
+                } footer: {
+                    if keyFingerprint != nil {
+                        Text(isKeyVerified
+                            ? "This key was cryptographically signed by the account owner."
+                            : "This key was not signed. Verify fingerprint out-of-band for sensitive communications."
+                        )
+                    }
+                }
+
+                Section {
                     Button {
                         contactsStore.toggleFavorite(address: address)
                     } label: {
@@ -95,6 +139,7 @@ struct ProfileView: View {
             }
             .onAppear {
                 editedName = contact?.name ?? ""
+                fetchEncryptionKey()
             }
         }
         #if os(macOS)
@@ -126,6 +171,31 @@ struct ProfileView: View {
         let name = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !name.isEmpty {
             contactsStore.rename(address: address, to: name)
+        }
+    }
+
+    private func fetchEncryptionKey() {
+        guard let chat = appState.chat else { return }
+
+        Task {
+            isLoadingKey = true
+            defer { isLoadingKey = false }
+
+            do {
+                let address = try Algorand.Address(string: address)
+                let publicKey = try await chat.fetchPublicKey(for: address)
+
+                // Generate fingerprint
+                keyFingerprint = SignatureVerifier.fingerprint(of: publicKey.rawRepresentation)
+
+                // Check if the conversation has a verified key
+                // For now, we can't easily determine if the key was verified during discovery
+                // so we'll mark as verified if we have the key (future: track verification status)
+                isKeyVerified = false  // TODO: Track verification status from key discovery
+            } catch {
+                keyFingerprint = nil
+                isKeyVerified = false
+            }
         }
     }
 
@@ -365,4 +435,5 @@ struct AddContactView: View {
 #Preview {
     ProfileView(address: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         .environmentObject(ContactsStore())
+        .environmentObject(ApplicationState())
 }

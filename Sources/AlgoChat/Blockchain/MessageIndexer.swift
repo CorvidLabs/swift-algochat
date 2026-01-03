@@ -137,8 +137,8 @@ public actor MessageIndexer {
     /// Finds a user's encryption public key from their past transactions
     ///
     /// Searches the user's transaction history to find an AlgoChat message
-    /// containing their public key. The search depth can be configured to
-    /// search more transactions at the cost of additional indexer queries.
+    /// containing their public key. Prefers V3 envelopes with verified signatures
+    /// to prevent key substitution attacks.
     ///
     /// - Parameters:
     ///   - address: The user's Algorand address
@@ -155,6 +155,7 @@ public actor MessageIndexer {
             limit: searchDepth
         )
 
+        // First pass: look for V3 envelopes with valid signatures
         for tx in response.transactions {
             guard tx.sender == address.description,
                   let noteData = tx.noteData,
@@ -162,8 +163,43 @@ public actor MessageIndexer {
                 continue
             }
 
-            let envelope = try ChatEnvelope.decode(from: noteData)
-            return try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+            guard let envelope = try? ChatEnvelope.decode(from: noteData) else {
+                continue
+            }
+
+            // V3 envelopes have signatures - verify before trusting
+            if envelope.hasSignature, let signature = envelope.signature {
+                let isValid = try SignatureVerifier.verify(
+                    encryptionPublicKey: envelope.senderPublicKey,
+                    signedBy: address,
+                    signature: signature
+                )
+
+                if isValid {
+                    return try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+                }
+                // Invalid signature - skip this transaction, try next
+                continue
+            }
+        }
+
+        // Second pass: fall back to V1/V2 envelopes (no signature verification)
+        // This maintains backward compatibility with older clients
+        for tx in response.transactions {
+            guard tx.sender == address.description,
+                  let noteData = tx.noteData,
+                  isChatMessage(noteData) else {
+                continue
+            }
+
+            guard let envelope = try? ChatEnvelope.decode(from: noteData) else {
+                continue
+            }
+
+            // Accept V1/V2 envelopes without signature (legacy compatibility)
+            if !envelope.hasSignature {
+                return try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+            }
         }
 
         throw ChatError.publicKeyNotFound(address.description)
@@ -228,7 +264,11 @@ public actor MessageIndexer {
 
     private func isChatMessage(_ data: Data) -> Bool {
         guard data.count >= 2 else { return false }
-        return data[0] == ChatEnvelope.version && data[1] == ChatEnvelope.protocolID
+        let version = data[0]
+        let validVersion = version == ChatEnvelope.versionV1
+            || version == ChatEnvelope.versionV2
+            || version == ChatEnvelope.versionV3
+        return validVersion && data[1] == ChatEnvelope.protocolID
     }
 
     private func parseMessage(

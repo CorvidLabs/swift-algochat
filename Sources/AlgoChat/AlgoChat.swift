@@ -356,6 +356,9 @@ public actor AlgoChat {
     /// encryption public key, allowing other users to discover it and send
     /// encrypted messages without needing to receive a message first.
     ///
+    /// The key is signed with the account's Ed25519 key (V3 envelope) to prove
+    /// ownership and prevent key substitution attacks.
+    ///
     /// The key-publish transaction is automatically filtered from the
     /// conversation list.
     ///
@@ -365,11 +368,18 @@ public actor AlgoChat {
         let payload = KeyPublishPayload()
         let payloadData = try JSONEncoder().encode(payload)
 
-        // Encrypt with our own key (self-encryption)
-        let envelope = try MessageEncryptor.encryptRaw(
+        // Sign the encryption public key with Ed25519 to prove ownership
+        let signature = try SignatureVerifier.sign(
+            encryptionPublicKey: account.publicKeyData,
+            with: account.account
+        )
+
+        // Encrypt with our own key (self-encryption), using V3 signed envelope
+        let envelope = try MessageEncryptor.encryptWithSignature(
             payloadData,
             senderPrivateKey: account.encryptionPrivateKey,
-            recipientPublicKey: account.encryptionPublicKey
+            recipientPublicKey: account.encryptionPublicKey,
+            signature: signature
         )
 
         // Get transaction parameters
