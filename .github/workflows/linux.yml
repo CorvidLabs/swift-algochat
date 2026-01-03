@@ -17,7 +17,7 @@ jobs:
         run: swift build -v
 
       - name: Run tests
-        run: swift test -v --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier"
+        run: swift test -v --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier|FileKeyStorage"
 
   cli:
     runs-on: ubuntu-latest
