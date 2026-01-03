@@ -30,6 +30,14 @@ import Foundation
 /// let messages = try await chat.fetchMessages(with: recipientAddress)
 /// ```
 public actor AlgoChat {
+    // MARK: - Constants
+
+    /// Minimum transaction fee in microAlgos
+    private static let minTransactionFee: UInt64 = 1000
+
+    /// Minimum account balance in microAlgos (to avoid account closure)
+    private static let minAccountBalance: UInt64 = 100_000
+
     // MARK: - Properties
 
     /// The underlying AlgoKit client
@@ -230,6 +238,23 @@ public actor AlgoChat {
         to conversation: Conversation,
         options: SendOptions = .default
     ) async throws -> SendResult {
+        // Validate message size before encryption
+        let messageBytes = Data(message.utf8)
+        let maxSize = ChatEnvelope.maxPayloadSizeV2
+        if messageBytes.count > maxSize {
+            throw ChatError.messageTooLarge(maxSize: maxSize)
+        }
+
+        // Check balance before proceeding
+        let currentBalance = try await balance()
+        let requiredBalance = Self.minTransactionFee + Self.minAccountBalance
+        if currentBalance.value < requiredBalance {
+            throw ChatError.insufficientBalance(
+                required: requiredBalance,
+                available: currentBalance.value
+            )
+        }
+
         // Get recipient's encryption public key
         let pubKey: Curve25519.KeyAgreement.PublicKey
         if let cached = conversation.participantEncryptionKey {
