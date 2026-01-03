@@ -831,39 +831,109 @@ struct AlgoChatCLI {
             await terminal.writeLine("No conversations yet.".yellow)
             await terminal.writeLine("Send a message to start chatting!".dim)
         } else {
-            let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
-            await terminal.writeLine("═══ Conversations ═══ \(networkLabel)".cyan.bold)
-            await terminal.writeLine("")
-
-            // Build options for selection
-            var options: [String] = []
-            for conv in allConversations {
-                let shortAddr = truncateAddress(conv.participant.description)
-                if let last = conv.lastMessage {
-                    let time = formatRelativeTime(last.timestamp)
-                    let who = last.direction == .sent ? "You" : "Them"
-                    let preview = truncatePreview(last.content)
-                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs) - \(who): \(preview) [\(time)]")
-                } else {
-                    options.append("📱 \(shortAddr) (\(conv.messageCount) msgs)")
-                }
-            }
-            options.append("Back")
-
-            let selection = try await terminal.select(
-                "Select a conversation",
-                options: options
+            try await showConversationList(
+                conversations: allConversations,
+                chat: chat,
+                terminal: terminal,
+                searchTerm: nil
             )
+        }
+    }
 
-            if selection == "Back" {
-                return
+    static func showConversationList(
+        conversations: [Conversation],
+        chat: AlgoChat,
+        terminal: Terminal,
+        searchTerm: String?
+    ) async throws {
+        // Filter conversations if search term provided
+        let filtered: [Conversation]
+        if let term = searchTerm, !term.isEmpty {
+            let lowercased = term.lowercased()
+            filtered = conversations.filter { conv in
+                conv.participant.description.lowercased().contains(lowercased)
             }
+        } else {
+            filtered = conversations
+        }
 
-            // Find the selected conversation
-            if let index = options.firstIndex(of: selection), index < allConversations.count {
-                let conv = allConversations[index]
-                try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)
+        let networkLabel = isLocalnet ? "[Localnet]".yellow : "[TestNet]".cyan
+        let searchLabel = searchTerm != nil ? " (filtered)".dim : ""
+        await terminal.writeLine("═══ Conversations ═══ \(networkLabel)\(searchLabel)".cyan.bold)
+        await terminal.writeLine("")
+
+        if filtered.isEmpty && searchTerm != nil {
+            await terminal.writeLine("No conversations matching '\(searchTerm!)'.".yellow)
+            await terminal.writeLine("")
+        }
+
+        // Build options for selection
+        var options: [String] = []
+
+        // Add search option
+        if searchTerm == nil {
+            options.append("🔍 Search by address")
+        } else {
+            options.append("🔍 Clear search")
+        }
+
+        for conv in filtered {
+            let shortAddr = truncateAddress(conv.participant.description)
+            if let last = conv.lastMessage {
+                let time = formatRelativeTime(last.timestamp)
+                let who = last.direction == .sent ? "You" : "Them"
+                let preview = truncatePreview(last.content)
+                options.append("📱 \(shortAddr) (\(conv.messageCount) msgs) - \(who): \(preview) [\(time)]")
+            } else {
+                options.append("📱 \(shortAddr) (\(conv.messageCount) msgs)")
             }
+        }
+        options.append("Back")
+
+        let selection = try await terminal.select(
+            "Select a conversation",
+            options: options
+        )
+
+        if selection == "Back" {
+            return
+        }
+
+        if selection == "🔍 Search by address" {
+            let term = try await terminal.input("Search (address substring)")
+            if !term.isEmpty {
+                try await showConversationList(
+                    conversations: conversations,
+                    chat: chat,
+                    terminal: terminal,
+                    searchTerm: term
+                )
+            } else {
+                try await showConversationList(
+                    conversations: conversations,
+                    chat: chat,
+                    terminal: terminal,
+                    searchTerm: nil
+                )
+            }
+            return
+        }
+
+        if selection == "🔍 Clear search" {
+            try await showConversationList(
+                conversations: conversations,
+                chat: chat,
+                terminal: terminal,
+                searchTerm: nil
+            )
+            return
+        }
+
+        // Find the selected conversation (offset by 1 for search option)
+        let conversationOptions = options.dropFirst().dropLast() // Remove search and Back
+        if let index = conversationOptions.firstIndex(of: selection) {
+            let conv = filtered[index]
+            try await viewConversation(chat: chat, participant: conv.participant, terminal: terminal)
         }
     }
 
