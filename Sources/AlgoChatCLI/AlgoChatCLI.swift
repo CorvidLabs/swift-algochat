@@ -19,11 +19,76 @@ struct AlgoChatCLI {
 
     // MARK: - State
 
-    /// Shared key storage for biometric access
+    /// Shared key storage (Keychain on Apple platforms, file-based on Linux)
+    #if os(iOS) || os(macOS) || os(visionOS)
     static let keyStorage = KeychainKeyStorage()
+    #else
+    static let fileKeyStorage = FileKeyStorage()
+    #endif
 
     /// Selected network (set at startup)
     nonisolated(unsafe) static var isLocalnet: Bool = true
+
+    /// Whether we're running on Linux
+    static var isLinux: Bool {
+        #if os(Linux)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    // MARK: - Cross-Platform Key Storage Helpers
+
+    /// Lists stored addresses from the appropriate storage
+    static func listStoredAddresses() async throws -> [Address] {
+        #if os(iOS) || os(macOS) || os(visionOS)
+        return try await keyStorage.listStoredAddresses()
+        #else
+        return try await fileKeyStorage.listStoredAddresses()
+        #endif
+    }
+
+    /// Checks if a key exists for an address
+    static func hasStoredKey(for address: Address) async -> Bool {
+        #if os(iOS) || os(macOS) || os(visionOS)
+        return await keyStorage.hasKey(for: address)
+        #else
+        return await fileKeyStorage.hasKey(for: address)
+        #endif
+    }
+
+    /// Prompts for password on Linux (required for file storage)
+    static func promptForStoragePassword(terminal: Terminal, forSaving: Bool = false) async throws -> String? {
+        #if os(Linux)
+        if forSaving {
+            await terminal.writeLine("")
+            await terminal.writeLine("Create a password to encrypt your keys:".dim)
+            let password = try await terminal.secret("Password")
+            if password.isEmpty {
+                return nil
+            }
+            let confirm = try await terminal.secret("Confirm password")
+            if password != confirm {
+                await terminal.writeLine("Passwords don't match.".red)
+                return nil
+            }
+            await fileKeyStorage.setPassword(password)
+            return password
+        } else {
+            await terminal.writeLine("")
+            await terminal.writeLine("Enter password to unlock your keys:".dim)
+            let password = try await terminal.secret("Password")
+            if password.isEmpty {
+                return nil
+            }
+            await fileKeyStorage.setPassword(password)
+            return password
+        }
+        #else
+        return nil  // Not needed on Apple platforms
+        #endif
+    }
 
     /// Network display name
     static var networkName: String {
@@ -50,16 +115,47 @@ struct AlgoChatCLI {
 
     /// Finds Docker executable path
     static func findDockerPath() -> String? {
+        // Common Docker paths across platforms
         let paths = [
-            "/opt/homebrew/bin/docker",  // Apple Silicon Homebrew
-            "/usr/local/bin/docker",      // Intel Homebrew / standard
-            "/usr/bin/docker"             // System install
+            "/opt/homebrew/bin/docker",   // Apple Silicon Homebrew
+            "/usr/local/bin/docker",      // Intel Homebrew / standard macOS
+            "/usr/bin/docker",            // Linux system install
+            "/snap/bin/docker",           // Ubuntu Snap install
+            "/usr/bin/podman"             // Podman (Docker alternative on Linux)
         ]
+
         for path in paths {
             if FileManager.default.fileExists(atPath: path) {
                 return path
             }
         }
+
+        // Fallback: try 'which docker' on Unix systems
+        #if os(Linux) || os(macOS)
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        task.arguments = ["docker"]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+
+            if task.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty {
+                    return path
+                }
+            }
+        } catch {
+            // which failed, return nil
+        }
+        #endif
+
         return nil
     }
 
@@ -75,13 +171,16 @@ struct AlgoChatCLI {
         """.cyan)
         await terminal.writeLine("")
 
-        // Check for biometric availability
+        // Check for key storage availability
         #if os(iOS) || os(macOS) || os(visionOS)
         let biometricType = KeychainKeyStorage.biometricType
         if biometricType != .none {
             await terminal.writeLine("🔐 \(biometricType.rawValue) available for secure key storage".dim)
             await terminal.writeLine("")
         }
+        #else
+        await terminal.writeLine("🔐 Password-protected key storage available (~/.algochat/keys/)".dim)
+        await terminal.writeLine("")
         #endif
 
         // Main app loop
@@ -151,7 +250,7 @@ struct AlgoChatCLI {
                 }
             } else {
                 // Check for saved accounts
-                let savedAddresses = try await keyStorage.listStoredAddresses()
+                let savedAddresses = try await listStoredAddresses()
 
                 // Build menu options
                 var options = [String]()
@@ -240,13 +339,23 @@ struct AlgoChatCLI {
         #if os(iOS) || os(macOS) || os(visionOS)
         let biometric = KeychainKeyStorage.biometricType.rawValue
         await terminal.writeLine("Authenticate with \(biometric) to unlock your encryption key...".dim)
+        #else
+        // On Linux, prompt for password first
+        guard let _ = try? await promptForStoragePassword(terminal: terminal, forSaving: false) else {
+            await terminal.writeLine("Cancelled.".yellow)
+            return nil
+        }
         #endif
 
         do {
             // First, we need the mnemonic to get the Algorand account for signing
-            // The biometric only protects the encryption key, not the signing key
+            // The biometric/password only protects the encryption key, not the signing key
             await terminal.writeLine("")
+            #if os(iOS) || os(macOS) || os(visionOS)
             await terminal.writeLine("Enter mnemonic for signing (encryption key is biometric-protected):".dim)
+            #else
+            await terminal.writeLine("Enter mnemonic for signing (encryption key is password-protected):".dim)
+            #endif
 
             let mnemonic = try await terminal.secret("Mnemonic")
 
@@ -263,18 +372,25 @@ struct AlgoChatCLI {
                 return nil
             }
 
-            // Now retrieve the encryption key with biometric
+            // Now retrieve the encryption key
             let account = try await terminal.withSpinner(
                 message: "Authenticating",
                 style: .dots
             ) {
+                #if os(iOS) || os(macOS) || os(visionOS)
                 try await ChatAccount(account: algorandAccount, storage: keyStorage)
+                #else
+                try await ChatAccount(account: algorandAccount, storage: fileKeyStorage)
+                #endif
             }
 
-            await terminal.writeLine("Account loaded with biometric-protected encryption key!".green)
+            await terminal.writeLine("Account loaded with protected encryption key!".green)
             return account
         } catch KeyStorageError.biometricFailed {
             await terminal.writeLine("Biometric authentication failed or was cancelled.".red)
+            return nil
+        } catch KeyStorageError.decryptionFailed {
+            await terminal.writeLine("Incorrect password.".red)
             return nil
         } catch KeyStorageError.keyNotFound {
             await terminal.writeLine("Encryption key not found. Please load from mnemonic.".red)
@@ -301,6 +417,25 @@ struct AlgoChatCLI {
             if save.hasPrefix("Yes") {
                 try await account.saveEncryptionKey(to: keyStorage, requireBiometric: true)
                 await terminal.writeLine("✅ Encryption key saved! You can now use \(biometric) to access your messages.".green)
+            }
+        } catch {
+            await terminal.writeLine("Note: Could not save key - \(error.localizedDescription)".yellow)
+        }
+        #else
+        // On Linux, offer password-protected file storage
+        await terminal.writeLine("")
+        do {
+            let save = try await terminal.select(
+                "Save encryption key with password protection?",
+                options: ["Yes, save with password", "No, don't save"]
+            )
+
+            if save.hasPrefix("Yes") {
+                guard let _ = try await promptForStoragePassword(terminal: terminal, forSaving: true) else {
+                    return
+                }
+                try await account.saveEncryptionKey(to: fileKeyStorage, requireBiometric: false)
+                await terminal.writeLine("✅ Encryption key saved to ~/.algochat/keys/".green)
             }
         } catch {
             await terminal.writeLine("Note: Could not save key - \(error.localizedDescription)".yellow)
@@ -749,16 +884,29 @@ struct AlgoChatCLI {
         await terminal.writeLine("  \(pubKey.hexString)".magenta)
         await terminal.writeLine("")
 
+        // Show key fingerprint for easy verification
+        let fingerprint = SignatureVerifier.fingerprint(of: pubKey)
+        await terminal.writeLine("Key Fingerprint:".dim)
+        await terminal.writeLine("  \(fingerprint)".yellow)
+        await terminal.writeLine("")
+
         // Check if key is saved
+        #if os(iOS) || os(macOS) || os(visionOS)
         let hasSavedKey = await account.hasStoredEncryptionKey(in: keyStorage)
         if hasSavedKey {
-            #if os(iOS) || os(macOS) || os(visionOS)
             let biometric = KeychainKeyStorage.biometricType.rawValue
             await terminal.writeLine("Key Storage:".dim)
             await terminal.writeLine("  🔐 Protected by \(biometric)".green)
             await terminal.writeLine("")
-            #endif
         }
+        #else
+        let hasSavedKey = await account.hasStoredEncryptionKey(in: fileKeyStorage)
+        if hasSavedKey {
+            await terminal.writeLine("Key Storage:".dim)
+            await terminal.writeLine("  🔐 Password-protected (~/.algochat/keys/)".green)
+            await terminal.writeLine("")
+        }
+        #endif
 
         do {
             let balance = try await terminal.withSpinner(

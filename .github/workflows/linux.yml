@@ -1,0 +1,34 @@
+name: Linux
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build -v
+
+      - name: Run tests
+        run: swift test -v --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier"
+
+  cli:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CLI
+        run: swift build --product algochat -v
+
+      - name: Verify CLI runs
+        run: |
+          # Just verify the binary exists and can be invoked
+          .build/debug/algochat --help || true

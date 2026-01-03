@@ -55,6 +55,8 @@ public enum KeyStorageError: Error, LocalizedError {
     case biometricNotAvailable
     case biometricFailed
     case invalidKeyData
+    case passwordRequired
+    case decryptionFailed
 
     public var errorDescription: String? {
         switch self {
@@ -70,6 +72,10 @@ public enum KeyStorageError: Error, LocalizedError {
             return "Biometric authentication failed"
         case .invalidKeyData:
             return "Stored key data is invalid"
+        case .passwordRequired:
+            return "Password is required to access stored keys"
+        case .decryptionFailed:
+            return "Failed to decrypt key - incorrect password"
         }
     }
 }
