@@ -146,10 +146,10 @@ struct PublicKeyCacheTests {
         let cache = PublicKeyCache()
         let key = Curve25519.KeyAgreement.PrivateKey().publicKey
 
-        await cache.store(key, for: testAddress)
+        await cache.store(key.rawRepresentation, for: testAddress)
         let retrieved = await cache.retrieve(for: testAddress)
 
-        #expect(retrieved?.rawRepresentation == key.rawRepresentation)
+        #expect(retrieved == key.rawRepresentation)
     }
 
     @Test("Returns nil for non-existent key")
@@ -164,7 +164,7 @@ struct PublicKeyCacheTests {
         let cache = PublicKeyCache()
         let key = Curve25519.KeyAgreement.PrivateKey().publicKey
 
-        await cache.store(key, for: testAddress)
+        await cache.store(key.rawRepresentation, for: testAddress)
         await cache.invalidate(for: testAddress)
 
         let retrieved = await cache.retrieve(for: testAddress)
@@ -176,7 +176,7 @@ struct PublicKeyCacheTests {
         let cache = PublicKeyCache()
         let key = Curve25519.KeyAgreement.PrivateKey().publicKey
 
-        await cache.store(key, for: testAddress)
+        await cache.store(key.rawRepresentation, for: testAddress)
         await cache.clear()
 
         let retrieved = await cache.retrieve(for: testAddress)
@@ -189,7 +189,7 @@ struct PublicKeyCacheTests {
         let cache = PublicKeyCache(ttl: 0.1)  // 100ms TTL
         let key = Curve25519.KeyAgreement.PrivateKey().publicKey
 
-        await cache.store(key, for: testAddress)
+        await cache.store(key.rawRepresentation, for: testAddress)
 
         // Wait for expiration
         try await Task.sleep(nanoseconds: 200_000_000)  // 200ms
@@ -203,12 +203,12 @@ struct PublicKeyCacheTests {
         let cache = PublicKeyCache(ttl: 10)  // 10 second TTL
         let key = Curve25519.KeyAgreement.PrivateKey().publicKey
 
-        await cache.store(key, for: testAddress)
+        await cache.store(key.rawRepresentation, for: testAddress)
 
         // Small wait (well under TTL)
         try await Task.sleep(nanoseconds: 10_000_000)  // 10ms
 
         let retrieved = await cache.retrieve(for: testAddress)
-        #expect(retrieved?.rawRepresentation == key.rawRepresentation)
+        #expect(retrieved == key.rawRepresentation)
     }
 }

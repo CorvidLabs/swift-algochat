@@ -6,19 +6,22 @@ import Foundation
 ///
 /// Reduces blockchain queries when sending messages by caching
 /// previously discovered recipient public keys.
+///
+/// Keys are stored and retrieved as raw bytes (`Data`) to enable
+/// Sendable conformance across actor boundaries in Swift 6.
 public protocol PublicKeyCacheProtocol: Sendable {
     /// Store a public key for an address
     ///
     /// - Parameters:
-    ///   - key: The X25519 public key
+    ///   - keyData: The X25519 public key raw representation
     ///   - address: The Algorand address this key belongs to
-    func store(_ key: Curve25519.KeyAgreement.PublicKey, for address: Address) async
+    func store(_ keyData: Data, for address: Address) async
 
-    /// Retrieve a cached public key
+    /// Retrieve a cached public key's raw representation
     ///
     /// - Parameter address: The Algorand address to look up
-    /// - Returns: The cached public key, or nil if not found
-    func retrieve(for address: Address) async -> Curve25519.KeyAgreement.PublicKey?
+    /// - Returns: The cached public key raw bytes, or nil if not found/expired
+    func retrieve(for address: Address) async -> Data?
 
     /// Invalidate a cached public key
     ///
@@ -34,13 +37,15 @@ public protocol PublicKeyCacheProtocol: Sendable {
 /// In-memory implementation of PublicKeyCache
 ///
 /// Stores public keys in memory with optional TTL expiration.
+/// Keys are stored as raw bytes (Data) to enable Sendable conformance
+/// across actor boundaries in Swift 6.
 public actor PublicKeyCache: PublicKeyCacheProtocol {
-    private struct CachedKey {
-        let key: Curve25519.KeyAgreement.PublicKey
+    private struct CachedKeyData: Sendable {
+        let rawRepresentation: Data
         let cachedAt: Date
     }
 
-    private var cache: [String: CachedKey] = [:]
+    private var cache: [String: CachedKeyData] = [:]
 
     /// Time-to-live for cached keys (default: 24 hours)
     public let ttl: TimeInterval
@@ -52,11 +57,14 @@ public actor PublicKeyCache: PublicKeyCacheProtocol {
         self.ttl = ttl
     }
 
-    public func store(_ key: Curve25519.KeyAgreement.PublicKey, for address: Address) async {
-        cache[address.description] = CachedKey(key: key, cachedAt: Date())
+    public func store(_ keyData: Data, for address: Address) async {
+        cache[address.description] = CachedKeyData(
+            rawRepresentation: keyData,
+            cachedAt: Date()
+        )
     }
 
-    public func retrieve(for address: Address) async -> Curve25519.KeyAgreement.PublicKey? {
+    public func retrieve(for address: Address) async -> Data? {
         guard let cached = cache[address.description] else {
             return nil
         }
@@ -67,7 +75,7 @@ public actor PublicKeyCache: PublicKeyCacheProtocol {
             return nil
         }
 
-        return cached.key
+        return cached.rawRepresentation
     }
 
     public func invalidate(for address: Address) async {

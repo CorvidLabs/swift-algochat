@@ -362,7 +362,8 @@ public actor AlgoChat {
         for address: Address
     ) async throws -> Curve25519.KeyAgreement.PublicKey {
         // Check cache first
-        if let cached = await publicKeyCache.retrieve(for: address) {
+        if let cachedData = await publicKeyCache.retrieve(for: address),
+           let cached = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: cachedData) {
             return cached
         }
 
@@ -370,7 +371,7 @@ public actor AlgoChat {
         let discovered = try await indexer.findPublicKey(for: address)
 
         // Cache for future lookups
-        await publicKeyCache.store(discovered.publicKey, for: address)
+        await publicKeyCache.store(discovered.publicKey.rawRepresentation, for: address)
 
         return discovered.publicKey
     }
