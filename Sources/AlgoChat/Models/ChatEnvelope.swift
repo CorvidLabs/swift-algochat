@@ -1,17 +1,19 @@
 import Foundation
 
-/// The wire format for encrypted messages stored in transaction notes
-///
-/// **Format** - Forward secrecy with bidirectional decryption:
-/// - Version: 1 byte (0x01)
-/// - Protocol: 1 byte (0x01 = AlgoChat)
-/// - Sender Static Public Key: 32 bytes (X25519)
-/// - Sender Ephemeral Public Key: 32 bytes (X25519)
-/// - Nonce: 12 bytes (ChaCha20-Poly1305)
-/// - Encrypted Sender Key: 48 bytes (symmetric key encrypted for sender + tag)
-/// - Ciphertext + Tag: remaining bytes
-/// - Overhead: 142 bytes (126-byte header + 16-byte tag), max message: 882 bytes
-/// - Both sender and recipient can decrypt their own messages
+/**
+ The wire format for encrypted messages stored in transaction notes
+
+ **Format** - Forward secrecy with bidirectional decryption:
+ - Version: 1 byte (0x01)
+ - Protocol: 1 byte (0x01 = AlgoChat)
+ - Sender Static Public Key: 32 bytes (X25519)
+ - Sender Ephemeral Public Key: 32 bytes (X25519)
+ - Nonce: 12 bytes (ChaCha20-Poly1305)
+ - Encrypted Sender Key: 48 bytes (symmetric key encrypted for sender + tag)
+ - Ciphertext + Tag: remaining bytes
+ - Overhead: 142 bytes (126-byte header + 16-byte tag), max message: 882 bytes
+ - Both sender and recipient can decrypt their own messages
+ */
 public struct ChatEnvelope: Sendable {
     // MARK: - Constants
 
@@ -53,12 +55,14 @@ public struct ChatEnvelope: Sendable {
 
     // MARK: - Initialization
 
-    /// Creates an envelope with forward secrecy and bidirectional decryption
-    ///
-    /// - Precondition: `senderPublicKey` must be 32 bytes (X25519 public key)
-    /// - Precondition: `ephemeralPublicKey` must be 32 bytes (X25519 public key)
-    /// - Precondition: `encryptedSenderKey` must be 48 bytes (32-byte key + 16-byte tag)
-    /// - Precondition: `nonce` must be 12 bytes (ChaCha20-Poly1305 nonce)
+    /**
+     Creates an envelope with forward secrecy and bidirectional decryption
+
+     - Precondition: `senderPublicKey` must be 32 bytes (X25519 public key)
+     - Precondition: `ephemeralPublicKey` must be 32 bytes (X25519 public key)
+     - Precondition: `encryptedSenderKey` must be 48 bytes (32-byte key + 16-byte tag)
+     - Precondition: `nonce` must be 12 bytes (ChaCha20-Poly1305 nonce)
+     */
     public init(
         senderPublicKey: Data,
         ephemeralPublicKey: Data,

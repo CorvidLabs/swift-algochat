@@ -7,9 +7,11 @@ public protocol SendQueueStorage: Sendable {
     func load() async throws -> [PendingMessage]
 }
 
-/// Actor that manages a queue of pending messages
-///
-/// Messages can be enqueued when offline and sent when connectivity is restored.
+/**
+ Actor that manages a queue of pending messages
+
+ Messages can be enqueued when offline and sent when connectivity is restored.
+ */
 public actor SendQueue {
     private var pending: [PendingMessage] = []
     private let storage: (any SendQueueStorage)?
@@ -18,11 +20,13 @@ public actor SendQueue {
     /// Callback for when a message permanently fails
     public var onPermanentFailure: (@Sendable (PendingMessage) -> Void)?
 
-    /// Creates a new send queue
-    ///
-    /// - Parameters:
-    ///   - storage: Optional storage for persistence (nil for in-memory only)
-    ///   - maxRetries: Maximum number of retries before giving up (default: 3)
+    /**
+     Creates a new send queue
+
+     - Parameters:
+       - storage: Optional storage for persistence (nil for in-memory only)
+       - maxRetries: Maximum number of retries before giving up (default: 3)
+     */
     public init(storage: (any SendQueueStorage)? = nil, maxRetries: Int = 3) {
         self.storage = storage
         self.maxRetries = maxRetries
@@ -42,13 +46,15 @@ public actor SendQueue {
         try await persist()
     }
 
-    /// Creates and enqueues a new pending message
-    ///
-    /// - Parameters:
-    ///   - content: The message content
-    ///   - recipient: The recipient address
-    ///   - replyContext: Optional reply context
-    /// - Returns: The created pending message
+    /**
+     Creates and enqueues a new pending message
+
+     - Parameters:
+       - content: The message content
+       - recipient: The recipient address
+       - replyContext: Optional reply context
+     - Returns: The created pending message
+     */
     @discardableResult
     public func enqueue(
         content: String,
@@ -80,23 +86,27 @@ public actor SendQueue {
         try await persist()
     }
 
-    /// Marks a message as successfully sent
-    ///
-    /// This removes the message from the queue.
-    ///
-    /// - Parameters:
-    ///   - id: The message ID
-    ///   - txid: The transaction ID (for logging/tracking)
+    /**
+     Marks a message as successfully sent
+
+     This removes the message from the queue.
+
+     - Parameters:
+       - id: The message ID
+       - txid: The transaction ID (for logging/tracking)
+     */
     public func markSent(_ id: UUID, txid: String) async throws {
         pending.removeAll { $0.id == id }
         try await persist()
     }
 
-    /// Marks a message as failed
-    ///
-    /// - Parameters:
-    ///   - id: The message ID
-    ///   - error: The error that occurred
+    /**
+     Marks a message as failed
+
+     - Parameters:
+       - id: The message ID
+       - error: The error that occurred
+     */
     public func markFailed(_ id: UUID, error: Error) async throws {
         guard let index = pending.firstIndex(where: { $0.id == id }) else { return }
         pending[index] = pending[index].markFailed(error: error.localizedDescription)

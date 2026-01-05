@@ -1,19 +1,23 @@
 import Algorand
 import Foundation
 
-/// Result of a successful send operation
-///
-/// Contains both the transaction ID for blockchain tracking and an optimistic
-/// copy of the sent message for immediate local UI updates without waiting
-/// for indexer confirmation.
+/**
+ Result of a successful send operation
+
+ Contains both the transaction ID for blockchain tracking and an optimistic
+ copy of the sent message for immediate local UI updates without waiting
+ for indexer confirmation.
+ */
 public struct SendResult: Sendable {
     /// The Algorand transaction ID
     public let txid: String
 
-    /// The sent message for optimistic local updates
-    ///
-    /// This message can be immediately appended to a conversation's message
-    /// list to show the sent message before the indexer catches up.
+    /**
+     The sent message for optimistic local updates
+
+     This message can be immediately appended to a conversation's message
+     list to show the sent message before the indexer catches up.
+     */
     public let message: Message
 
     public init(txid: String, message: Message) {
@@ -58,9 +62,11 @@ public struct SendOptions: Sendable {
         replyContext: nil
     )
 
-    /// Options that wait for both algod confirmation and indexer visibility
-    /// Use this when you need to ensure the message is immediately visible
-    /// when fetching conversations (e.g., self-messages)
+    /**
+     Options that wait for both algod confirmation and indexer visibility
+     Use this when you need to ensure the message is immediately visible
+     when fetching conversations (e.g., self-messages)
+     */
     public static let indexed = SendOptions(
         waitForConfirmation: true,
         timeout: 10,
@@ -83,14 +89,16 @@ public struct SendOptions: Sendable {
         self.replyContext = replyContext
     }
 
-    /// Creates options for replying to a message
-    ///
-    /// - Parameters:
-    ///   - message: The message to reply to
-    ///   - confirmed: Whether to wait for confirmation (default: false)
-    ///   - indexed: Whether to wait for indexer visibility (default: false)
-    ///   - timeout: Maximum rounds to wait (default: 10)
-    /// - Returns: SendOptions configured for a reply
+    /**
+     Creates options for replying to a message
+
+     - Parameters:
+       - message: The message to reply to
+       - confirmed: Whether to wait for confirmation (default: false)
+       - indexed: Whether to wait for indexer visibility (default: false)
+       - timeout: Maximum rounds to wait (default: 10)
+     - Returns: SendOptions configured for a reply
+     */
     public static func replying(
         to message: Message,
         confirmed: Bool = false,

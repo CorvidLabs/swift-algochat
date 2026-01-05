@@ -2,38 +2,40 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
-/// File-based encryption key storage with password protection
-///
-/// Stores X25519 encryption keys encrypted with AES-256-GCM, using a password
-/// derived key via PBKDF2. Keys are stored in `~/.algochat/keys/`.
-///
-/// This is the primary storage mechanism for Linux and can be used on any platform.
-///
-/// ## Storage Format
-///
-/// Each key file contains:
-/// - Salt: 32 bytes (random, for PBKDF2)
-/// - Nonce: 12 bytes (random, for AES-GCM)
-/// - Ciphertext: 32 bytes + 16 byte tag (encrypted private key)
-///
-/// ## Security
-///
-/// - Uses PBKDF2 with 100,000 iterations for key derivation
-/// - Uses AES-256-GCM for authenticated encryption
-/// - Keys are stored with 600 permissions (owner read/write only)
-/// - Salt is unique per key file
-///
-/// ## Usage
-///
-/// ```swift
-/// let storage = FileKeyStorage(password: "user-password")
-///
-/// // Store a key
-/// try await storage.store(privateKey: key, for: address, requireBiometric: false)
-///
-/// // Retrieve
-/// let key = try await storage.retrieve(for: address)
-/// ```
+/**
+ File-based encryption key storage with password protection
+
+ Stores X25519 encryption keys encrypted with AES-256-GCM, using a password
+ derived key via PBKDF2. Keys are stored in `~/.algochat/keys/`.
+
+ This is the primary storage mechanism for Linux and can be used on any platform.
+
+ ## Storage Format
+
+ Each key file contains:
+ - Salt: 32 bytes (random, for PBKDF2)
+ - Nonce: 12 bytes (random, for AES-GCM)
+ - Ciphertext: 32 bytes + 16 byte tag (encrypted private key)
+
+ ## Security
+
+ - Uses PBKDF2 with 100,000 iterations for key derivation
+ - Uses AES-256-GCM for authenticated encryption
+ - Keys are stored with 600 permissions (owner read/write only)
+ - Salt is unique per key file
+
+ ## Usage
+
+ ```swift
+ let storage = FileKeyStorage(password: "user-password")
+
+ // Store a key
+ try await storage.store(privateKey: key, for: address, requireBiometric: false)
+
+ // Retrieve
+ let key = try await storage.retrieve(for: address)
+ ```
+ */
 public actor FileKeyStorage: EncryptionKeyStorage {
     // MARK: - Constants
 
@@ -62,10 +64,12 @@ public actor FileKeyStorage: EncryptionKeyStorage {
 
     // MARK: - Initialization
 
-    /// Creates a new file key storage
-    ///
-    /// - Parameter password: Optional password for encryption. If nil, password must
-    ///   be set before storing or retrieving keys.
+    /**
+     Creates a new file key storage
+
+     - Parameter password: Optional password for encryption. If nil, password must
+       be set before storing or retrieving keys.
+     */
     public init(password: String? = nil) {
         self.password = password
     }
@@ -291,14 +295,16 @@ public actor FileKeyStorage: EncryptionKeyStorage {
 
 /// PBKDF2 key derivation using swift-crypto
 private enum PBKDF2<Hash: HashFunction> {
-    /// Derives a symmetric key from a password
-    ///
-    /// - Parameters:
-    ///   - password: The password data
-    ///   - salt: The salt data
-    ///   - iterations: Number of PBKDF2 iterations
-    ///   - keyByteCount: Desired output key length in bytes
-    /// - Returns: The derived symmetric key
+    /**
+     Derives a symmetric key from a password
+
+     - Parameters:
+       - password: The password data
+       - salt: The salt data
+       - iterations: Number of PBKDF2 iterations
+       - keyByteCount: Desired output key length in bytes
+     - Returns: The derived symmetric key
+     */
     static func deriveKey(
         from password: Data,
         salt: Data,

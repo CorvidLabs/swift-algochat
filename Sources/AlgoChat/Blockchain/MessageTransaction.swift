@@ -7,15 +7,17 @@ public enum MessageTransaction {
     /// Minimum payment amount for a message (0.001 ALGO)
     public static let minimumPayment = MicroAlgos(1000)
 
-    /// Creates a payment transaction carrying an encrypted message
-    ///
-    /// - Parameters:
-    ///   - sender: The sending chat account
-    ///   - recipient: The recipient's Algorand address
-    ///   - envelope: The encrypted message envelope
-    ///   - params: Transaction parameters from the network
-    ///   - amount: Optional payment amount (default: minimum)
-    /// - Returns: Unsigned PaymentTransaction
+    /**
+     Creates a payment transaction carrying an encrypted message
+
+     - Parameters:
+       - sender: The sending chat account
+       - recipient: The recipient's Algorand address
+       - envelope: The encrypted message envelope
+       - params: Transaction parameters from the network
+       - amount: Optional payment amount (default: minimum)
+     - Returns: Unsigned PaymentTransaction
+     */
     public static func create(
         from sender: ChatAccount,
         to recipient: Address,

@@ -5,29 +5,31 @@ import Algorand
 import LocalAuthentication
 import Security
 
-/// Keychain-based encryption key storage with biometric protection
-///
-/// Stores X25519 encryption keys in the system Keychain, optionally protected
-/// by Touch ID, Face ID, or device passcode.
-///
-/// ## Usage
-///
-/// ```swift
-/// let storage = KeychainKeyStorage()
-///
-/// // Store a key with biometric protection
-/// try await storage.store(privateKey: key, for: address, requireBiometric: true)
-///
-/// // Retrieve (will prompt for Touch ID/Face ID)
-/// let key = try await storage.retrieve(for: address)
-/// ```
-///
-/// ## Security
-///
-/// - Keys are stored in the Secure Enclave when available
-/// - Keys are NOT synced to iCloud
-/// - Keys are tied to this device only
-/// - Biometric check happens in hardware
+/**
+ Keychain-based encryption key storage with biometric protection
+
+ Stores X25519 encryption keys in the system Keychain, optionally protected
+ by Touch ID, Face ID, or device passcode.
+
+ ## Usage
+
+ ```swift
+ let storage = KeychainKeyStorage()
+
+ // Store a key with biometric protection
+ try await storage.store(privateKey: key, for: address, requireBiometric: true)
+
+ // Retrieve (will prompt for Touch ID/Face ID)
+ let key = try await storage.retrieve(for: address)
+ ```
+
+ ## Security
+
+ - Keys are stored in the Secure Enclave when available
+ - Keys are NOT synced to iCloud
+ - Keys are tied to this device only
+ - Biometric check happens in hardware
+ */
 public actor KeychainKeyStorage: EncryptionKeyStorage {
     /// Service identifier for Keychain items
     private let service = "com.algochat.encryption-keys"
@@ -260,10 +262,12 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
-/// In-memory key storage for platforms without Keychain support
-///
-/// Keys are stored only in memory and will be lost when the app closes.
-/// This is a fallback for platforms that don't support Keychain with biometrics.
+/**
+ In-memory key storage for platforms without Keychain support
+
+ Keys are stored only in memory and will be lost when the app closes.
+ This is a fallback for platforms that don't support Keychain with biometrics.
+ */
 public actor KeychainKeyStorage: EncryptionKeyStorage {
     private var keys: [String: Data] = [:]
 

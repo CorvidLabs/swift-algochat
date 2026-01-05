@@ -10,13 +10,15 @@ public enum KeyDerivation {
     /// Info parameter for HKDF
     private static let info = Data("x25519-key".utf8)
 
-    /// Derives X25519 encryption key pair from an Algorand account
-    ///
-    /// The conversion from Ed25519 to X25519 uses HKDF with domain separation
-    /// to derive an independent encryption key from the account's private key material.
-    ///
-    /// - Parameter account: The Algorand account
-    /// - Returns: Tuple of (private key, public key) for Curve25519 key agreement
+    /**
+     Derives X25519 encryption key pair from an Algorand account
+
+     The conversion from Ed25519 to X25519 uses HKDF with domain separation
+     to derive an independent encryption key from the account's private key material.
+
+     - Parameter account: The Algorand account
+     - Returns: Tuple of (private key, public key) for Curve25519 key agreement
+     */
     public static func deriveEncryptionKeys(
         from account: Account
     ) throws -> (Curve25519.KeyAgreement.PrivateKey, Curve25519.KeyAgreement.PublicKey) {

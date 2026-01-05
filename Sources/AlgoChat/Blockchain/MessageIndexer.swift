@@ -16,13 +16,15 @@ public actor MessageIndexer {
         self.chatAccount = chatAccount
     }
 
-    /// Fetches messages for a conversation
-    ///
-    /// - Parameters:
-    ///   - participant: The other party in the conversation
-    ///   - afterRound: Only fetch messages after this round
-    ///   - limit: Maximum number of messages to fetch
-    /// - Returns: Array of decrypted messages
+    /**
+     Fetches messages for a conversation
+
+     - Parameters:
+       - participant: The other party in the conversation
+       - afterRound: Only fetch messages after this round
+       - limit: Maximum number of messages to fetch
+     - Returns: Array of decrypted messages
+     */
     public func fetchMessages(
         with participant: Address,
         afterRound: UInt64? = nil,
@@ -74,13 +76,15 @@ public actor MessageIndexer {
         return allMessages.sorted { $0.timestamp < $1.timestamp }
     }
 
-    /// Fetches all conversations for the current account
-    ///
-    /// Scans recent transactions to discover all chat participants and their
-    /// message history. Conversations are sorted by most recent message.
-    ///
-    /// - Parameter limit: Maximum number of transactions to scan (default: 100)
-    /// - Returns: Array of conversations sorted by most recent activity
+    /**
+     Fetches all conversations for the current account
+
+     Scans recent transactions to discover all chat participants and their
+     message history. Conversations are sorted by most recent message.
+
+     - Parameter limit: Maximum number of transactions to scan (default: 100)
+     - Returns: Array of conversations sorted by most recent activity
+     */
     public func fetchConversations(limit: Int = 100) async throws -> [Conversation] {
         let response = try await indexerClient.searchTransactions(
             address: chatAccount.address,
@@ -134,16 +138,18 @@ public actor MessageIndexer {
             .sorted { ($0.lastMessage?.timestamp ?? .distantPast) > ($1.lastMessage?.timestamp ?? .distantPast) }
     }
 
-    /// Finds a user's encryption public key from their past transactions
-    ///
-    /// Searches the user's transaction history to find an AlgoChat message
-    /// containing their public key.
-    ///
-    /// - Parameters:
-    ///   - address: The user's Algorand address
-    ///   - searchDepth: Number of transactions to search (default: 200)
-    /// - Returns: The discovered key
-    /// - Throws: `ChatError.publicKeyNotFound` if no chat history exists
+    /**
+     Finds a user's encryption public key from their past transactions
+
+     Searches the user's transaction history to find an AlgoChat message
+     containing their public key.
+
+     - Parameters:
+       - address: The user's Algorand address
+       - searchDepth: Number of transactions to search (default: 200)
+     - Returns: The discovered key
+     - Throws: `ChatError.publicKeyNotFound` if no chat history exists
+     */
     public func findPublicKey(
         for address: Address,
         searchDepth: Int = 200
@@ -171,18 +177,20 @@ public actor MessageIndexer {
         throw ChatError.publicKeyNotFound(address.description)
     }
 
-    /// Polls the indexer until a specific transaction appears
-    ///
-    /// Uses exponential backoff with jitter to reduce load on the indexer
-    /// while still providing timely notification when the transaction appears.
-    ///
-    /// - Parameters:
-    ///   - txid: The transaction ID to wait for
-    ///   - timeout: Maximum time to wait in seconds
-    ///   - initialInterval: Initial time between polls (default: 0.5 seconds)
-    ///   - maxInterval: Maximum time between polls (default: 5.0 seconds)
-    ///   - backoffMultiplier: Factor to increase interval each attempt (default: 1.5)
-    /// - Returns: true if the transaction was found, false if timeout
+    /**
+     Polls the indexer until a specific transaction appears
+
+     Uses exponential backoff with jitter to reduce load on the indexer
+     while still providing timely notification when the transaction appears.
+
+     - Parameters:
+       - txid: The transaction ID to wait for
+       - timeout: Maximum time to wait in seconds
+       - initialInterval: Initial time between polls (default: 0.5 seconds)
+       - maxInterval: Maximum time between polls (default: 5.0 seconds)
+       - backoffMultiplier: Factor to increase interval each attempt (default: 1.5)
+     - Returns: true if the transaction was found, false if timeout
+     */
     public func waitForTransaction(
         _ txid: String,
         timeout: TimeInterval,

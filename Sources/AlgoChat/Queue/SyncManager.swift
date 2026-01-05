@@ -1,10 +1,12 @@
 import Algorand
 import Foundation
 
-/// Manages synchronization of pending messages with the blockchain
-///
-/// The SyncManager monitors connectivity and automatically processes
-/// the send queue when online.
+/**
+ Manages synchronization of pending messages with the blockchain
+
+ The SyncManager monitors connectivity and automatically processes
+ the send queue when online.
+ */
 public actor SyncManager {
     private let queue: SendQueue
     private var isSyncing = false
@@ -26,11 +28,13 @@ public actor SyncManager {
         self.queue = queue
     }
 
-    /// Updates connectivity status
-    ///
-    /// When transitioning from offline to online, automatically triggers a sync.
-    ///
-    /// - Parameter online: Whether the network is available
+    /**
+     Updates connectivity status
+
+     When transitioning from offline to online, automatically triggers a sync.
+
+     - Parameter online: Whether the network is available
+     */
     public func setOnline(_ online: Bool) async {
         let wasOffline = !isOnline
         isOnline = online
@@ -96,15 +100,17 @@ public actor SyncManager {
         }
     }
 
-    /// Adds a message to the queue
-    ///
-    /// Use this when offline to queue messages for later sending.
-    ///
-    /// - Parameters:
-    ///   - content: The message content
-    ///   - recipient: The recipient address
-    ///   - replyContext: Optional reply context
-    /// - Returns: The pending message
+    /**
+     Adds a message to the queue
+
+     Use this when offline to queue messages for later sending.
+
+     - Parameters:
+       - content: The message content
+       - recipient: The recipient address
+       - replyContext: Optional reply context
+     - Returns: The pending message
+     */
     @discardableResult
     public func queueMessage(
         content: String,
