@@ -25,7 +25,7 @@ Initial public release.
 - **CLI tool** - Interactive command-line interface for testing
 
 ### Security
-- Envelope format v4 with ephemeral keys and encrypted sender key
+- Envelope format v1 with ephemeral keys and encrypted sender key
 - HKDF key derivation with domain separation
 - Secure random generation via platform APIs
 - No force unwraps or unsafe operations in library code
@@ -39,8 +39,7 @@ Initial public release.
 - Linux (via swift-crypto)
 
 ### Notes
-- This is envelope format **v4** - the first public wire format
-- Prior internal versions (v1-v3) were development iterations and are not supported
+- This is envelope format **v1** - the first public wire format
 
 ### Dependencies
 - swift-algokit 0.0.2+

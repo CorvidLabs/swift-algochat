@@ -50,7 +50,7 @@ AlgoChat provides the following security properties:
 
 ### Key Derivation
 - Encryption keys derived from Algorand account via **HKDF-SHA256**
-- Domain separation: `"AlgoChatV4"` prevents cross-protocol attacks
+- Domain separation: `"AlgoChatV1"` prevents cross-protocol attacks
 - Salt derived from account address for deterministic key generation
 
 ### Key Storage
@@ -76,7 +76,7 @@ AlgoChat provides the following security properties:
 | Password KDF | PBKDF2-SHA256 | swift-crypto |
 | Random Generation | SecRandomCopyBytes / /dev/urandom | Platform |
 
-### Envelope Format (v4)
+### Envelope Format (v1)
 ```
 [version: 1][protocol: 1][sender_pubkey: 32][ephemeral_pubkey: 32][nonce: 12][encrypted_sender_key: 48][ciphertext: variable]
 ```

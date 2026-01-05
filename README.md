@@ -138,7 +138,7 @@ swift test --filter "LocalnetIntegration"
 3. **Storage** - Encrypted payload stored in transaction note field
 4. **Discovery** - Public keys discovered by scanning sender's transaction history
 
-### Message Envelope Format (v4)
+### Message Envelope Format (v1)
 
 ```
 [version: 1 byte][protocol: 1 byte][sender_pubkey: 32 bytes][ephemeral_pubkey: 32 bytes][nonce: 12 bytes][encrypted_sender_key: 48 bytes][ciphertext+tag: variable]

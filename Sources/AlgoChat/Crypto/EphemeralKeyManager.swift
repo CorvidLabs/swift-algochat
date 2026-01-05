@@ -44,7 +44,7 @@ public struct EphemeralKeyManager: Sendable {
 
         // Include sender's static public key in the info to bind the key derivation
         // to both parties' identities
-        var info = Data("AlgoChatV2".utf8)
+        var info = Data("AlgoChatV1".utf8)
         info.append(senderStaticPublicKey.rawRepresentation)
         info.append(recipientPublicKey.rawRepresentation)
 
@@ -87,7 +87,7 @@ public struct EphemeralKeyManager: Sendable {
         }
 
         // Must use the same derivation parameters as encryption
-        var info = Data("AlgoChatV2".utf8)
+        var info = Data("AlgoChatV1".utf8)
         info.append(senderStaticPublicKey.rawRepresentation)
         info.append(recipientPrivateKey.publicKey.rawRepresentation)
 
