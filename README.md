@@ -7,6 +7,8 @@
 
 > **Pre-1.0 Notice**: This library is under active development. The API may change between minor versions until 1.0.
 
+> **Security Notice**: This library has not been independently audited. While it uses well-established cryptographic primitives from [swift-crypto](https://github.com/apple/swift-crypto), use in production is at your own risk.
+
 Encrypted peer-to-peer messaging on the Algorand blockchain. Built with Swift 6 and async/await.
 
 ## Features
