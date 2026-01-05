@@ -1,19 +1,21 @@
 import Foundation
 
-/// File-based persistent storage for the send queue
-///
-/// Stores pending messages as JSON in `~/.algochat/queue.json`.
-/// Messages survive app crashes and restarts.
-///
-/// ## Usage
-///
-/// ```swift
-/// let storage = FileSendQueueStorage()
-/// let queue = SendQueue(storage: storage)
-///
-/// // Load any pending messages from previous session
-/// try await queue.load()
-/// ```
+/**
+ File-based persistent storage for the send queue
+
+ Stores pending messages as JSON in `~/.algochat/queue.json`.
+ Messages survive app crashes and restarts.
+
+ ## Usage
+
+ ```swift
+ let storage = FileSendQueueStorage()
+ let queue = SendQueue(storage: storage)
+
+ // Load any pending messages from previous session
+ try await queue.load()
+ ```
+ */
 public actor FileSendQueueStorage: SendQueueStorage {
     // MARK: - Constants
 

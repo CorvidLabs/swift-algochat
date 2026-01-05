@@ -1,9 +1,11 @@
 import Algorand
 import Foundation
 
-/// In-memory implementation of MessageCache
-///
-/// Useful for testing and ephemeral caching. Data is lost when the app terminates.
+/**
+ In-memory implementation of MessageCache
+
+ Useful for testing and ephemeral caching. Data is lost when the app terminates.
+ */
 public actor InMemoryMessageCache: MessageCache {
     private var messagesByParticipant: [String: [Message]] = [:]
     private var lastSyncRounds: [String: UInt64] = [:]

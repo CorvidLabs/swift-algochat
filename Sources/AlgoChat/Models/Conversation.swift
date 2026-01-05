@@ -2,10 +2,12 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
-/// A conversation between two Algorand addresses
-///
-/// Note: Uses `@unchecked Sendable` because `Curve25519` keys from swift-crypto
-/// are not marked `Sendable` but are effectively immutable and thread-safe.
+/**
+ A conversation between two Algorand addresses
+
+ Note: Uses `@unchecked Sendable` because `Curve25519` keys from swift-crypto
+ are not marked `Sendable` but are effectively immutable and thread-safe.
+ */
 public struct Conversation: @unchecked Sendable, Identifiable {
     /// Unique identifier (the other party's address)
     public var id: String { participant.description }

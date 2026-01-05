@@ -1,10 +1,12 @@
 import Algorand
 import Foundation
 
-/// A message that is queued for sending
-///
-/// Pending messages are stored when the app is offline or when a send fails.
-/// They can be retried when connectivity is restored.
+/**
+ A message that is queued for sending
+
+ Pending messages are stored when the app is offline or when a send fails.
+ They can be retried when connectivity is restored.
+ */
 public struct PendingMessage: Codable, Sendable, Identifiable, Equatable {
     /// Unique identifier for this pending message
     public let id: UUID

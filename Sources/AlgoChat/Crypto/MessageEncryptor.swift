@@ -5,12 +5,14 @@ import Foundation
 import Security
 #endif
 
-/// Encrypts and decrypts chat messages using ChaCha20-Poly1305
-///
-/// Uses ephemeral key ECDH with bidirectional decryption:
-/// - Generates fresh key pair per message for forward secrecy
-/// - Encrypts symmetric key for sender, allowing sender to decrypt sent messages
-/// - Both sender and recipient can decrypt the message
+/**
+ Encrypts and decrypts chat messages using ChaCha20-Poly1305
+
+ Uses ephemeral key ECDH with bidirectional decryption:
+ - Generates fresh key pair per message for forward secrecy
+ - Encrypts symmetric key for sender, allowing sender to decrypt sent messages
+ - Both sender and recipient can decrypt the message
+ */
 public enum MessageEncryptor {
     // MARK: - Components
 
@@ -19,17 +21,19 @@ public enum MessageEncryptor {
 
     // MARK: - Encryption
 
-    /// Encrypts a message for a recipient using ephemeral key agreement
-    ///
-    /// Uses ephemeral key agreement: a fresh key pair is generated for each message,
-    /// providing sender-side forward secrecy. The envelope also includes an encrypted
-    /// copy of the symmetric key for the sender, enabling bidirectional decryption.
-    ///
-    /// - Parameters:
-    ///   - message: The plaintext message
-    ///   - senderPrivateKey: Sender's static X25519 private key
-    ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data
+    /**
+     Encrypts a message for a recipient using ephemeral key agreement
+
+     Uses ephemeral key agreement: a fresh key pair is generated for each message,
+     providing sender-side forward secrecy. The envelope also includes an encrypted
+     copy of the symmetric key for the sender, enabling bidirectional decryption.
+
+     - Parameters:
+       - message: The plaintext message
+       - senderPrivateKey: Sender's static X25519 private key
+       - recipientPublicKey: Recipient's X25519 public key
+     - Returns: ChatEnvelope containing encrypted data
+     */
     public static func encrypt(
         message: String,
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
@@ -45,17 +49,19 @@ public enum MessageEncryptor {
         )
     }
 
-    /// Encrypts a reply message for a recipient with forward secrecy
-    ///
-    /// Includes reply metadata in the encrypted payload. The content will
-    /// be formatted with a quoted preview of the original message.
-    ///
-    /// - Parameters:
-    ///   - message: The reply text
-    ///   - replyTo: Tuple of original transaction ID and preview text
-    ///   - senderPrivateKey: Sender's X25519 private key
-    ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data
+    /**
+     Encrypts a reply message for a recipient with forward secrecy
+
+     Includes reply metadata in the encrypted payload. The content will
+     be formatted with a quoted preview of the original message.
+
+     - Parameters:
+       - message: The reply text
+       - replyTo: Tuple of original transaction ID and preview text
+       - senderPrivateKey: Sender's X25519 private key
+       - recipientPublicKey: Recipient's X25519 public key
+     - Returns: ChatEnvelope containing encrypted data
+     */
     public static func encrypt(
         message: String,
         replyTo: (txid: String, preview: String),
@@ -79,15 +85,17 @@ public enum MessageEncryptor {
         )
     }
 
-    /// Encrypts raw data for a recipient with forward secrecy
-    ///
-    /// Used internally and for special payloads like key-publish.
-    ///
-    /// - Parameters:
-    ///   - data: The raw data to encrypt
-    ///   - senderPrivateKey: Sender's X25519 private key
-    ///   - recipientPublicKey: Recipient's X25519 public key
-    /// - Returns: ChatEnvelope containing encrypted data
+    /**
+     Encrypts raw data for a recipient with forward secrecy
+
+     Used internally and for special payloads like key-publish.
+
+     - Parameters:
+       - data: The raw data to encrypt
+       - senderPrivateKey: Sender's X25519 private key
+       - recipientPublicKey: Recipient's X25519 public key
+     - Returns: ChatEnvelope containing encrypted data
+     */
     public static func encryptRaw(
         _ data: Data,
         senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
@@ -166,15 +174,17 @@ public enum MessageEncryptor {
 
     // MARK: - Decryption
 
-    /// Decrypts a message envelope and returns structured content
-    ///
-    /// Automatically detects whether the caller is the sender or recipient
-    /// and uses the appropriate decryption path. Returns nil for key-publish payloads.
-    ///
-    /// - Parameters:
-    ///   - envelope: The encrypted envelope
-    ///   - recipientPrivateKey: The decryptor's X25519 private key (sender or recipient)
-    /// - Returns: DecryptedContent with text and optional reply metadata, or nil for key-publish
+    /**
+     Decrypts a message envelope and returns structured content
+
+     Automatically detects whether the caller is the sender or recipient
+     and uses the appropriate decryption path. Returns nil for key-publish payloads.
+
+     - Parameters:
+       - envelope: The encrypted envelope
+       - recipientPrivateKey: The decryptor's X25519 private key (sender or recipient)
+     - Returns: DecryptedContent with text and optional reply metadata, or nil for key-publish
+     */
     public static func decrypt(
         envelope: ChatEnvelope,
         recipientPrivateKey: Curve25519.KeyAgreement.PrivateKey

@@ -2,10 +2,12 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
-/// A chat-enabled Algorand account with encryption keys
-///
-/// Note: Uses `@unchecked Sendable` because `Curve25519` keys from swift-crypto
-/// are not marked `Sendable` but are effectively immutable and thread-safe.
+/**
+ A chat-enabled Algorand account with encryption keys
+
+ Note: Uses `@unchecked Sendable` because `Curve25519` keys from swift-crypto
+ are not marked `Sendable` but are effectively immutable and thread-safe.
+ */
 public struct ChatAccount: @unchecked Sendable {
     /// The underlying Algorand account
     public let account: Account
@@ -46,15 +48,17 @@ public struct ChatAccount: @unchecked Sendable {
 
     // MARK: - Keychain-Based Initialization
 
-    /// Creates a chat account using a stored encryption key from Keychain
-    ///
-    /// This allows loading the encryption key via biometric authentication
-    /// without needing to provide the full mnemonic.
-    ///
-    /// - Parameters:
-    ///   - account: The Algorand account (for signing transactions)
-    ///   - storage: The key storage to retrieve the encryption key from
-    /// - Throws: `KeyStorageError` if the key is not found or biometric fails
+    /**
+     Creates a chat account using a stored encryption key from Keychain
+
+     This allows loading the encryption key via biometric authentication
+     without needing to provide the full mnemonic.
+
+     - Parameters:
+       - account: The Algorand account (for signing transactions)
+       - storage: The key storage to retrieve the encryption key from
+     - Throws: `KeyStorageError` if the key is not found or biometric fails
+     */
     public init(
         account: Account,
         storage: EncryptionKeyStorage
@@ -64,15 +68,17 @@ public struct ChatAccount: @unchecked Sendable {
         self.encryptionPublicKey = encryptionPrivateKey.publicKey
     }
 
-    /// Creates a chat account with only an encryption key (no signing capability)
-    ///
-    /// This is useful for read-only access to messages when you have the
-    /// encryption key stored but don't have the full account mnemonic.
-    ///
-    /// - Parameters:
-    ///   - address: The Algorand address
-    ///   - encryptionKey: The X25519 private key for decryption
-    /// - Note: This account cannot sign transactions (send messages)
+    /**
+     Creates a chat account with only an encryption key (no signing capability)
+
+     This is useful for read-only access to messages when you have the
+     encryption key stored but don't have the full account mnemonic.
+
+     - Parameters:
+       - address: The Algorand address
+       - encryptionKey: The X25519 private key for decryption
+     - Note: This account cannot sign transactions (send messages)
+     */
     internal init(
         address: Address,
         encryptionKey: Curve25519.KeyAgreement.PrivateKey
@@ -86,14 +92,16 @@ public struct ChatAccount: @unchecked Sendable {
 
     // MARK: - Keychain Operations
 
-    /// Saves the encryption key to Keychain with biometric protection
-    ///
-    /// After calling this, the account can be loaded in future sessions
-    /// using biometric authentication instead of the mnemonic.
-    ///
-    /// - Parameters:
-    ///   - storage: The key storage to save to
-    ///   - requireBiometric: If true, require biometric/passcode to access
+    /**
+     Saves the encryption key to Keychain with biometric protection
+
+     After calling this, the account can be loaded in future sessions
+     using biometric authentication instead of the mnemonic.
+
+     - Parameters:
+       - storage: The key storage to save to
+       - requireBiometric: If true, require biometric/passcode to access
+     */
     public func saveEncryptionKey(
         to storage: EncryptionKeyStorage,
         requireBiometric: Bool = true
@@ -105,19 +113,23 @@ public struct ChatAccount: @unchecked Sendable {
         )
     }
 
-    /// Checks if an encryption key is stored for this account
-    ///
-    /// - Parameter storage: The key storage to check
-    /// - Returns: true if a key exists in storage for this address
+    /**
+     Checks if an encryption key is stored for this account
+
+     - Parameter storage: The key storage to check
+     - Returns: true if a key exists in storage for this address
+     */
     public func hasStoredEncryptionKey(
         in storage: EncryptionKeyStorage
     ) async -> Bool {
         await storage.hasKey(for: address)
     }
 
-    /// Deletes the stored encryption key for this account
-    ///
-    /// - Parameter storage: The key storage to delete from
+    /**
+     Deletes the stored encryption key for this account
+
+     - Parameter storage: The key storage to delete from
+     */
     public func deleteStoredEncryptionKey(
         from storage: EncryptionKeyStorage
     ) async throws {

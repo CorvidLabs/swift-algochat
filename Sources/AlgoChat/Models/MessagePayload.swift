@@ -1,10 +1,12 @@
 import Foundation
 
-/// Payload for key-publish transactions
-///
-/// Used to publish an encryption public key without sending an actual message.
-/// When decrypted, if the payload has `type: "key-publish"`, it should be
-/// filtered out from the message list.
+/**
+ Payload for key-publish transactions
+
+ Used to publish an encryption public key without sending an actual message.
+ When decrypted, if the payload has `type: "key-publish"`, it should be
+ filtered out from the message list.
+ */
 struct KeyPublishPayload: Codable, Sendable {
     let type: String
 
@@ -23,13 +25,15 @@ struct KeyPublishPayload: Codable, Sendable {
     }
 }
 
-/// Internal structure for message content with optional reply metadata
-///
-/// Used for structured message encoding. Plain text messages are encoded
-/// directly as strings; only messages with reply metadata use JSON encoding.
-///
-/// Detection: If decrypted content starts with `{` and contains a "text" field,
-/// parse as MessagePayload. Otherwise treat as plain text for backward compatibility.
+/**
+ Internal structure for message content with optional reply metadata
+
+ Used for structured message encoding. Plain text messages are encoded
+ directly as strings; only messages with reply metadata use JSON encoding.
+
+ Detection: If decrypted content starts with `{` and contains a "text" field,
+ parse as MessagePayload. Otherwise treat as plain text for backward compatibility.
+ */
 struct MessagePayload: Codable, Sendable {
     /// The message text content
     let text: String
@@ -51,11 +55,13 @@ struct MessagePayload: Codable, Sendable {
         self.replyTo = replyTo
     }
 
-    /// Creates a payload for a reply message
-    /// - Parameters:
-    ///   - text: The reply text
-    ///   - originalTxid: Transaction ID of the message being replied to
-    ///   - originalPreview: Preview of the original message (will be truncated to 80 chars)
+    /**
+     Creates a payload for a reply message
+     - Parameters:
+       - text: The reply text
+       - originalTxid: Transaction ID of the message being replied to
+       - originalPreview: Preview of the original message (will be truncated to 80 chars)
+     */
     static func reply(
         text: String,
         originalTxid: String,
@@ -71,14 +77,16 @@ struct MessagePayload: Codable, Sendable {
         )
     }
 
-    /// Formats the message with quoted preview for display
-    ///
-    /// If this is a reply, includes the quoted original:
-    /// ```
-    /// > Original message preview...
-    ///
-    /// Reply text here
-    /// ```
+    /**
+     Formats the message with quoted preview for display
+
+     If this is a reply, includes the quoted original:
+     ```
+     > Original message preview...
+
+     Reply text here
+     ```
+     */
     var formattedContent: String {
         guard let replyTo = replyTo else {
             return text

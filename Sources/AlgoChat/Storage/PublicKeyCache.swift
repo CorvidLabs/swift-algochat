@@ -2,43 +2,53 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
-/// Protocol for caching discovered public keys
-///
-/// Reduces blockchain queries when sending messages by caching
-/// previously discovered recipient public keys.
-///
-/// Keys are stored and retrieved as raw bytes (`Data`) to enable
-/// Sendable conformance across actor boundaries in Swift 6.
+/**
+ Protocol for caching discovered public keys
+
+ Reduces blockchain queries when sending messages by caching
+ previously discovered recipient public keys.
+
+ Keys are stored and retrieved as raw bytes (`Data`) to enable
+ Sendable conformance across actor boundaries in Swift 6.
+ */
 public protocol PublicKeyCacheProtocol: Sendable {
-    /// Store a public key for an address
-    ///
-    /// - Parameters:
-    ///   - keyData: The X25519 public key raw representation
-    ///   - address: The Algorand address this key belongs to
+    /**
+     Store a public key for an address
+
+     - Parameters:
+       - keyData: The X25519 public key raw representation
+       - address: The Algorand address this key belongs to
+     */
     func store(_ keyData: Data, for address: Address) async
 
-    /// Retrieve a cached public key's raw representation
-    ///
-    /// - Parameter address: The Algorand address to look up
-    /// - Returns: The cached public key raw bytes, or nil if not found/expired
+    /**
+     Retrieve a cached public key's raw representation
+
+     - Parameter address: The Algorand address to look up
+     - Returns: The cached public key raw bytes, or nil if not found/expired
+     */
     func retrieve(for address: Address) async -> Data?
 
-    /// Invalidate a cached public key
-    ///
-    /// Call this if key discovery fails or the key appears to be invalid.
-    ///
-    /// - Parameter address: The address to invalidate
+    /**
+     Invalidate a cached public key
+
+     Call this if key discovery fails or the key appears to be invalid.
+
+     - Parameter address: The address to invalidate
+     */
     func invalidate(for address: Address) async
 
     /// Clear all cached keys
     func clear() async
 }
 
-/// In-memory implementation of PublicKeyCache
-///
-/// Stores public keys in memory with optional TTL expiration.
-/// Keys are stored as raw bytes (Data) to enable Sendable conformance
-/// across actor boundaries in Swift 6.
+/**
+ In-memory implementation of PublicKeyCache
+
+ Stores public keys in memory with optional TTL expiration.
+ Keys are stored as raw bytes (Data) to enable Sendable conformance
+ across actor boundaries in Swift 6.
+ */
 public actor PublicKeyCache: PublicKeyCacheProtocol {
     private struct CachedKeyData: Sendable {
         let rawRepresentation: Data
