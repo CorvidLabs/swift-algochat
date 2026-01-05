@@ -137,7 +137,7 @@ public enum MessageEncryptor {
         )
 
         // Derive symmetric key for encrypting the main symmetric key
-        var senderKeyInfo = Data("AlgoChatV4-SenderKey".utf8)
+        var senderKeyInfo = Data("AlgoChatV1-SenderKey".utf8)
         senderKeyInfo.append(senderPrivateKey.publicKey.rawRepresentation)
         let senderEncryptionKey = senderSharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
@@ -245,7 +245,7 @@ public enum MessageEncryptor {
         )
 
         // Derive the key used to encrypt the symmetric key
-        var senderKeyInfo = Data("AlgoChatV4-SenderKey".utf8)
+        var senderKeyInfo = Data("AlgoChatV1-SenderKey".utf8)
         senderKeyInfo.append(senderPrivateKey.publicKey.rawRepresentation)
         let senderDecryptionKey = senderSharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,

@@ -2,12 +2,15 @@
 
 import PackageDescription
 
-var targets: [Target] = [
+let targets: [Target] = [
     .target(
         name: "AlgoChat",
         dependencies: [
             .product(name: "AlgoKit", package: "swift-algokit"),
             .product(name: "Crypto", package: "swift-crypto")
+        ],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
         ]
     ),
     .executableTarget(
@@ -15,15 +18,21 @@ var targets: [Target] = [
         dependencies: [
             "AlgoChat",
             .product(name: "CLI", package: "swift-cli")
+        ],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
         ]
     ),
     .testTarget(
         name: "AlgoChatTests",
-        dependencies: ["AlgoChat"]
+        dependencies: ["AlgoChat"],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
+        ]
     )
 ]
 
-var products: [Product] = [
+let products: [Product] = [
     .library(
         name: "AlgoChat",
         targets: ["AlgoChat"]
@@ -34,28 +43,13 @@ var products: [Product] = [
     )
 ]
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-targets.append(
-    .executableTarget(
-        name: "AlgoChatApp",
-        dependencies: ["AlgoChat"]
-    )
-)
-products.append(
-    .executable(
-        name: "AlgoChatApp",
-        targets: ["AlgoChatApp"]
-    )
-)
-#endif
-
 let package = Package(
     name: "swift-algochat",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
-        .tvOS(.v17),
-        .watchOS(.v10),
+        .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v15),
+        .watchOS(.v8),
         .visionOS(.v1)
     ],
     products: products,

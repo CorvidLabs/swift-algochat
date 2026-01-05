@@ -3,7 +3,7 @@ import Foundation
 /// The wire format for encrypted messages stored in transaction notes
 ///
 /// **Format** - Forward secrecy with bidirectional decryption:
-/// - Version: 1 byte (0x04)
+/// - Version: 1 byte (0x01)
 /// - Protocol: 1 byte (0x01 = AlgoChat)
 /// - Sender Static Public Key: 32 bytes (X25519)
 /// - Sender Ephemeral Public Key: 32 bytes (X25519)
@@ -16,7 +16,7 @@ public struct ChatEnvelope: Sendable {
     // MARK: - Constants
 
     /// Current version
-    public static let version: UInt8 = 0x04
+    public static let version: UInt8 = 0x01
 
     /// AlgoChat protocol identifier
     public static let protocolID: UInt8 = 0x01
