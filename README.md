@@ -138,13 +138,16 @@ swift test --filter "LocalnetIntegration"
 3. **Storage** - Encrypted payload stored in transaction note field
 4. **Discovery** - Public keys discovered by scanning sender's transaction history
 
-### Message Envelope Format
+### Message Envelope Format (v4)
 
 ```
-[version: 1 byte][protocol: 1 byte][sender_pubkey: 32 bytes][nonce: 12 bytes][ciphertext+tag: variable]
+[version: 1 byte][protocol: 1 byte][sender_pubkey: 32 bytes][ephemeral_pubkey: 32 bytes][nonce: 12 bytes][encrypted_sender_key: 48 bytes][ciphertext+tag: variable]
 ```
 
-Maximum message size: 962 bytes (after encryption overhead).
+- **Header size:** 126 bytes
+- **Maximum message size:** 882 bytes (after encryption overhead)
+- **Forward secrecy:** Ephemeral keys provide per-message forward secrecy
+- **Bidirectional decryption:** Both sender and recipient can decrypt messages
 
 ## License
 

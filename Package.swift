@@ -8,6 +8,9 @@ var targets: [Target] = [
         dependencies: [
             .product(name: "AlgoKit", package: "swift-algokit"),
             .product(name: "Crypto", package: "swift-crypto")
+        ],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
         ]
     ),
     .executableTarget(
@@ -15,11 +18,17 @@ var targets: [Target] = [
         dependencies: [
             "AlgoChat",
             .product(name: "CLI", package: "swift-cli")
+        ],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
         ]
     ),
     .testTarget(
         name: "AlgoChatTests",
-        dependencies: ["AlgoChat"]
+        dependencies: ["AlgoChat"],
+        swiftSettings: [
+            .enableExperimentalFeature("StrictConcurrency")
+        ]
     )
 ]
 
@@ -52,6 +61,8 @@ products.append(
 let package = Package(
     name: "swift-algochat",
     platforms: [
+        // Note: Library code is compatible with iOS 15+/macOS 12+, but
+        // the demo AlgoChatApp uses SwiftUI APIs requiring higher versions
         .iOS(.v17),
         .macOS(.v14),
         .tvOS(.v17),
