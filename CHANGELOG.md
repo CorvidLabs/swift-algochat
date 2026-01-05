@@ -31,10 +31,10 @@ Initial public release.
 - No force unwraps or unsafe operations in library code
 
 ### Platforms
-- macOS 14+ (library compatible with 12+)
-- iOS 17+ (library compatible with 15+)
-- tvOS 17+
-- watchOS 10+
+- macOS 12+
+- iOS 15+
+- tvOS 15+
+- watchOS 8+
 - visionOS 1+
 - Linux (via swift-crypto)
 

@@ -2,7 +2,7 @@
 
 import PackageDescription
 
-var targets: [Target] = [
+let targets: [Target] = [
     .target(
         name: "AlgoChat",
         dependencies: [
@@ -32,7 +32,7 @@ var targets: [Target] = [
     )
 ]
 
-var products: [Product] = [
+let products: [Product] = [
     .library(
         name: "AlgoChat",
         targets: ["AlgoChat"]
@@ -43,30 +43,13 @@ var products: [Product] = [
     )
 ]
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-targets.append(
-    .executableTarget(
-        name: "AlgoChatApp",
-        dependencies: ["AlgoChat"]
-    )
-)
-products.append(
-    .executable(
-        name: "AlgoChatApp",
-        targets: ["AlgoChatApp"]
-    )
-)
-#endif
-
 let package = Package(
     name: "swift-algochat",
     platforms: [
-        // Note: Library code is compatible with iOS 15+/macOS 12+, but
-        // the demo AlgoChatApp uses SwiftUI APIs requiring higher versions
-        .iOS(.v17),
-        .macOS(.v14),
-        .tvOS(.v17),
-        .watchOS(.v10),
+        .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v15),
+        .watchOS(.v8),
         .visionOS(.v1)
     ],
     products: products,
