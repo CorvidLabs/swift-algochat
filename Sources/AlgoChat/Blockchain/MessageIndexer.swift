@@ -20,12 +20,14 @@ public actor MessageIndexer {
     ///
     /// - Parameters:
     ///   - participant: The other party in the conversation
-    ///   - afterRound: Only fetch messages after this round
+    ///   - afterRound: Only fetch messages after this round (for forward pagination)
+    ///   - beforeRound: Only fetch messages before this round (for backward pagination)
     ///   - limit: Maximum number of messages to fetch
     /// - Returns: Array of decrypted messages
     public func fetchMessages(
         with participant: Address,
         afterRound: UInt64? = nil,
+        beforeRound: UInt64? = nil,
         limit: Int = defaultPageSize
     ) async throws -> [Message] {
         var allMessages: [Message] = []
@@ -37,7 +39,8 @@ public actor MessageIndexer {
         let response = try await indexerClient.searchTransactions(
             address: chatAccount.address,
             limit: limit,
-            minRound: afterRound
+            minRound: afterRound,
+            maxRound: beforeRound
         )
 
         for tx in response.transactions {
