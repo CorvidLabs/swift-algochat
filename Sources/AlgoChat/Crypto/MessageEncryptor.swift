@@ -203,7 +203,7 @@ public enum MessageEncryptor {
         let plaintext: Data
         if weAreTheSender {
             // Sender decryption: use the encrypted sender key
-            plaintext = try decryptAsSender(
+            plaintext = try decryptData(
                 envelope: envelope,
                 senderPrivateKey: recipientPrivateKey,
                 ephemeralPublicKey: ephemeralPublicKey
@@ -241,78 +241,7 @@ public enum MessageEncryptor {
         return DecryptedContent(text: message)
     }
 
-    // MARK: - Sender Decryption
-
-    /**
-     Decrypts a sent message envelope using the recipient's public key
-
-     When you sent a message, you encrypted with your_private + recipient_public.
-     To decrypt your own sent message, you need the recipient's public key.
-
-     - Parameters:
-       - envelope: The encrypted envelope
-       - senderPrivateKey: Your X25519 private key (you sent this message)
-       - recipientPublicKey: Recipient's X25519 public key
-     - Returns: DecryptedContent with text, or nil for key-publish
-     */
-    public static func decryptSent(
-        envelope: ChatEnvelope,
-        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
-        recipientPublicKey: Curve25519.KeyAgreement.PublicKey
-    ) throws -> DecryptedContent? {
-        // Derive shared secret using recipient's public key
-        let sharedSecret = try senderPrivateKey.sharedSecretFromKeyAgreement(
-            with: recipientPublicKey
-        )
-
-        // Derive symmetric key
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: Data(),
-            sharedInfo: sharedInfo,
-            outputByteCount: 32
-        )
-
-        // Extract ciphertext and tag
-        let ciphertextLength = envelope.ciphertext.count - ChatEnvelope.tagSize
-        guard ciphertextLength > 0 else {
-            throw ChatError.decryptionFailed("Ciphertext too short")
-        }
-
-        let ciphertext = envelope.ciphertext.prefix(ciphertextLength)
-        let tag = envelope.ciphertext.suffix(ChatEnvelope.tagSize)
-
-        // Reconstruct sealed box and decrypt
-        let nonce = try ChaChaPoly.Nonce(data: envelope.nonce)
-        let sealedBox = try ChaChaPoly.SealedBox(
-            nonce: nonce,
-            ciphertext: ciphertext,
-            tag: tag
-        )
-
-        let plaintext = try ChaChaPoly.open(sealedBox, using: symmetricKey)
-
-        // Check for key-publish payload
-        if KeyPublishPayload.isKeyPublish(plaintext) {
-            return nil
-        }
-
-        // Parse as structured or plain text
-        if plaintext.first == UInt8(ascii: "{"),
-           let payload = try? JSONDecoder().decode(MessagePayload.self, from: plaintext) {
-            return DecryptedContent(
-                text: payload.text,
-                replyToId: payload.replyTo?.txid,
-                replyToPreview: payload.replyTo?.preview
-            )
-        }
-
-        guard let message = String(data: plaintext, encoding: .utf8) else {
-            throw ChatError.decryptionFailed("Decrypted data is not valid UTF-8")
-        }
-
-        return DecryptedContent(text: message)
-    }
+    // MARK: - Internal Sender Decryption
 
     /// Internal method to decrypt envelope to raw data
     private static func decryptData(
