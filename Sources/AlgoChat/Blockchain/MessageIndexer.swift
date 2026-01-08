@@ -21,22 +21,28 @@ public actor MessageIndexer {
 
      - Parameters:
        - participant: The other party in the conversation
-       - afterRound: Only fetch messages after this round
+       - afterRound: Only fetch messages after this round (for forward pagination)
+       - beforeRound: Only fetch messages before this round (for backward pagination)
        - limit: Maximum number of messages to fetch
      - Returns: Array of decrypted messages
      */
     public func fetchMessages(
         with participant: Address,
         afterRound: UInt64? = nil,
+        beforeRound: UInt64? = nil,
         limit: Int = defaultPageSize
     ) async throws -> [Message] {
         var allMessages: [Message] = []
+
+        // Look up participant's public key for decrypting sent messages
+        let participantKey = try? await findPublicKey(for: participant)
 
         // Fetch transactions involving our account
         let response = try await indexerClient.searchTransactions(
             address: chatAccount.address,
             limit: limit,
-            minRound: afterRound
+            minRound: afterRound,
+            maxRound: beforeRound
         )
 
         for tx in response.transactions {
@@ -68,7 +74,12 @@ public actor MessageIndexer {
             }
 
             // Try to parse and decrypt the message
-            if let message = try? parseMessage(from: tx, direction: direction) {
+            // For sent messages, pass the participant's public key
+            if let message = try? parseMessage(
+                from: tx,
+                direction: direction,
+                recipientPublicKey: direction == .sent ? participantKey : nil
+            ) {
                 allMessages.append(message)
             }
         }
@@ -243,7 +254,8 @@ public actor MessageIndexer {
 
     private func parseMessage(
         from tx: IndexerTransaction,
-        direction: Message.Direction
+        direction: Message.Direction,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey? = nil
     ) throws -> Message? {
         guard let noteData = tx.noteData else {
             throw ChatError.invalidEnvelope("No note data")
@@ -253,10 +265,24 @@ public actor MessageIndexer {
 
         // Decrypt the message (returns structured content with optional reply metadata)
         // Returns nil for key-publish payloads, which should be filtered out
-        guard let decrypted = try MessageEncryptor.decrypt(
-            envelope: envelope,
-            recipientPrivateKey: chatAccount.encryptionPrivateKey
-        ) else {
+        let decrypted: DecryptedContent?
+
+        if direction == .sent, let recipientKey = recipientPublicKey {
+            // For sent messages, use decryptSent with the recipient's public key
+            decrypted = try MessageEncryptor.decryptSent(
+                envelope: envelope,
+                senderPrivateKey: chatAccount.encryptionPrivateKey,
+                recipientPublicKey: recipientKey
+            )
+        } else {
+            // For received messages, use normal decrypt
+            decrypted = try MessageEncryptor.decrypt(
+                envelope: envelope,
+                recipientPrivateKey: chatAccount.encryptionPrivateKey
+            )
+        }
+
+        guard let decrypted else {
             // Key-publish payload - not a real message
             return nil
         }

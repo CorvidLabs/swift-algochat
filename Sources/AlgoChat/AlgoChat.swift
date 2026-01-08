@@ -215,6 +215,46 @@ public actor AlgoChat {
         return (try? await cache.retrieve(for: participant, afterRound: nil)) ?? []
     }
 
+    /**
+     Loads older messages from the blockchain (backward pagination)
+
+     Use this to load message history before the oldest message in the conversation.
+
+     - Parameters:
+       - conversation: The conversation to load older messages for
+       - limit: Maximum number of messages to fetch
+     - Returns: Updated conversation with older messages merged in
+     */
+    public func loadOlder(
+        _ conversation: Conversation,
+        limit: Int = 50
+    ) async throws -> Conversation {
+        var updated = conversation
+
+        // Find the oldest message's round to paginate backwards
+        let oldestRound = conversation.messages
+            .map { $0.confirmedRound }
+            .filter { $0 > 0 }
+            .min()
+
+        // Fetch messages before the oldest round
+        let messages = try await indexer.fetchMessages(
+            with: conversation.participant,
+            beforeRound: oldestRound.map { $0 - 1 },  // -1 to exclude current oldest
+            limit: limit
+        )
+
+        updated.merge(messages)
+
+        // Update public key if we found it from received messages
+        if updated.participantEncryptionKey == nil,
+           messages.contains(where: { $0.direction == .received }) {
+            updated.participantEncryptionKey = try? await fetchPublicKey(for: conversation.participant)
+        }
+
+        return updated
+    }
+
     // MARK: - Sending Messages
 
     /**
