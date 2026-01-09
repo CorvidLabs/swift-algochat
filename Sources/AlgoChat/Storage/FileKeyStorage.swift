@@ -235,15 +235,23 @@ public actor FileKeyStorage: EncryptionKeyStorage {
         ).first else {
             throw KeyStorageError.directoryNotFound
         }
-        let directory = appSupport.appendingPathComponent("AlgoChat")
+        let directory = appSupport.appendingPathComponent(Self.directoryName)
         #endif
 
         if !FileManager.default.fileExists(atPath: directory.path) {
+            #if os(Linux) || os(macOS)
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            #else
             try FileManager.default.createDirectory(
                 at: directory,
                 withIntermediateDirectories: true,
                 attributes: nil
             )
+            #endif
         }
 
         return directory
