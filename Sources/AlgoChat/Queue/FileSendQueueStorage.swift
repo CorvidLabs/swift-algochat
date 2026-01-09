@@ -97,27 +97,51 @@ public actor FileSendQueueStorage: SendQueueStorage {
 
     /// Gets or creates the queue storage directory
     private func queueDirectory() throws -> URL {
-        let homeDir: URL
+        let baseDir: URL
+
         #if os(Linux)
         if let home = ProcessInfo.processInfo.environment["HOME"] {
-            homeDir = URL(fileURLWithPath: home)
+            baseDir = URL(fileURLWithPath: home)
         } else {
-            homeDir = URL(fileURLWithPath: "/tmp")
+            baseDir = URL(fileURLWithPath: "/tmp")
         }
+        let directory = baseDir.appendingPathComponent(Self.directoryName)
+        #elseif os(macOS)
+        baseDir = FileManager.default.homeDirectoryForCurrentUser
+        let directory = baseDir.appendingPathComponent(Self.directoryName)
         #else
-        homeDir = FileManager.default.homeDirectoryForCurrentUser
+        // iOS, tvOS, watchOS, visionOS - use Application Support directory
+        guard let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw FileSendQueueStorageError.directoryNotFound
+        }
+        let directory = appSupport.appendingPathComponent("AlgoChat")
         #endif
-
-        let directory = homeDir.appendingPathComponent(Self.directoryName)
 
         if !FileManager.default.fileExists(atPath: directory.path) {
             try FileManager.default.createDirectory(
                 at: directory,
                 withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
+                attributes: nil
             )
         }
 
         return directory
+    }
+}
+
+// MARK: - Errors
+
+/// Errors specific to file-based queue storage
+public enum FileSendQueueStorageError: Error, LocalizedError {
+    case directoryNotFound
+
+    public var errorDescription: String? {
+        switch self {
+        case .directoryNotFound:
+            return "Could not find application support directory"
+        }
     }
 }
