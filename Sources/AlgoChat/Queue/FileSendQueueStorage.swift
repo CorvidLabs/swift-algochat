@@ -115,7 +115,7 @@ public actor FileSendQueueStorage: SendQueueStorage {
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first else {
-            throw FileSendQueueStorageError.directoryNotFound
+            throw KeyStorageError.directoryNotFound
         }
         let directory = appSupport.appendingPathComponent("AlgoChat")
         #endif
@@ -129,19 +129,5 @@ public actor FileSendQueueStorage: SendQueueStorage {
         }
 
         return directory
-    }
-}
-
-// MARK: - Errors
-
-/// Errors specific to file-based queue storage
-public enum FileSendQueueStorageError: Error, LocalizedError {
-    case directoryNotFound
-
-    public var errorDescription: String? {
-        switch self {
-        case .directoryNotFound:
-            return "Could not find application support directory"
-        }
     }
 }

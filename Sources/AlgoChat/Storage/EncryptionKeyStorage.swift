@@ -69,6 +69,7 @@ public enum KeyStorageError: Error, LocalizedError {
     case invalidKeyData
     case passwordRequired
     case decryptionFailed
+    case directoryNotFound
 
     public var errorDescription: String? {
         switch self {
@@ -88,6 +89,8 @@ public enum KeyStorageError: Error, LocalizedError {
             return "Password is required to access stored keys"
         case .decryptionFailed:
             return "Failed to decrypt key - incorrect password"
+        case .directoryNotFound:
+            return "Could not find application support directory"
         }
     }
 }
