@@ -215,28 +215,7 @@ public actor FileKeyStorage: EncryptionKeyStorage {
 
     /// Gets or creates the key storage directory
     private func keyStorageDirectory() throws -> URL {
-        let homeDir: URL
-        #if os(Linux)
-        if let home = ProcessInfo.processInfo.environment["HOME"] {
-            homeDir = URL(fileURLWithPath: home)
-        } else {
-            homeDir = URL(fileURLWithPath: "/tmp")
-        }
-        #else
-        homeDir = FileManager.default.homeDirectoryForCurrentUser
-        #endif
-
-        let directory = homeDir.appendingPathComponent(Self.directoryName)
-
-        if !FileManager.default.fileExists(atPath: directory.path) {
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        }
-
-        return directory
+        try StorageDirectory.resolve(name: Self.directoryName)
     }
 
     /// Returns the file path for a key
