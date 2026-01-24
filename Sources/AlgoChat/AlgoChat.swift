@@ -346,7 +346,8 @@ public actor AlgoChat {
             from: account,
             to: conversation.participant,
             envelope: envelope,
-            params: params
+            params: params,
+            amount: options.amount ?? MessageTransaction.minimumPayment
         )
 
         // Submit transaction
