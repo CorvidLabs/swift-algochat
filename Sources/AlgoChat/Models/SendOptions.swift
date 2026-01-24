@@ -45,7 +45,7 @@ public struct SendOptions: Sendable {
     /// Reply context if this is a reply message
     public var replyContext: ReplyContext?
 
-    /// Custom payment amount (default: 0.001 ALGO / 1000 microAlgos)
+    /// Custom payment amount (nil uses default of 0.001 ALGO / 1000 microAlgos)
     public var amount: MicroAlgos?
 
     /// Default options (fire-and-forget, no reply)
@@ -106,7 +106,7 @@ public struct SendOptions: Sendable {
        - confirmed: Whether to wait for confirmation (default: false)
        - indexed: Whether to wait for indexer visibility (default: false)
        - timeout: Maximum rounds to wait (default: 10)
-       - amount: Custom payment amount (default: 0.001 ALGO)
+       - amount: Custom payment amount (nil uses default of 0.001 ALGO)
      - Returns: SendOptions configured for a reply
      */
     public static func replying(
