@@ -133,16 +133,18 @@ public struct SendOptions: Sendable {
        - amount: Payment amount in microAlgos
        - confirmed: Whether to wait for confirmation (default: false)
        - indexed: Whether to wait for indexer visibility (default: false)
+       - timeout: Maximum rounds to wait (default: 10)
      - Returns: SendOptions configured with the specified amount
      */
     public static func withAmount(
         _ amount: MicroAlgos,
         confirmed: Bool = false,
-        indexed: Bool = false
+        indexed: Bool = false,
+        timeout: UInt64 = 10
     ) -> SendOptions {
         SendOptions(
             waitForConfirmation: confirmed || indexed,
-            timeout: 10,
+            timeout: timeout,
             waitForIndexer: indexed,
             indexerTimeout: 30.0,
             replyContext: nil,
