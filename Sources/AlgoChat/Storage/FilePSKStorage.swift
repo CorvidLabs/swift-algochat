@@ -60,13 +60,13 @@ public actor FilePSKStorage: PSKStorage {
     // MARK: - PSKStorage
 
     public func storeContact(_ contact: PSKContact) async throws {
-        let url = contactURL(for: contact.address)
+        let url = try contactURL(for: contact.address)
         let data = try encoder.encode(contact)
         try data.write(to: url, options: .atomic)
     }
 
     public func retrieveContact(for address: String) async throws -> PSKContact? {
-        let url = contactURL(for: address)
+        let url = try contactURL(for: address)
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
@@ -75,8 +75,8 @@ public actor FilePSKStorage: PSKStorage {
     }
 
     public func deleteContact(for address: String) async throws {
-        let contactFile = contactURL(for: address)
-        let stateFile = stateURL(for: address)
+        let contactFile = try contactURL(for: address)
+        let stateFile = try stateURL(for: address)
 
         if FileManager.default.fileExists(atPath: contactFile.path) {
             try FileManager.default.removeItem(at: contactFile)
@@ -103,13 +103,13 @@ public actor FilePSKStorage: PSKStorage {
     }
 
     public func storeState(_ state: PSKState, for address: String) async throws {
-        let url = stateURL(for: address)
+        let url = try stateURL(for: address)
         let data = try encoder.encode(state)
         try data.write(to: url, options: .atomic)
     }
 
     public func retrieveState(for address: String) async throws -> PSKState? {
-        let url = stateURL(for: address)
+        let url = try stateURL(for: address)
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
@@ -119,13 +119,27 @@ public actor FilePSKStorage: PSKStorage {
 
     // MARK: - Private
 
+    /// Sanitizes an address for use as a filename, rejecting path traversal
+    private func sanitizedFilename(for address: String) throws -> String {
+        guard !address.isEmpty,
+              !address.contains("/"),
+              !address.contains("\\"),
+              !address.contains(".."),
+              !address.contains("\0") else {
+            throw ChatError.invalidRecipient("Address contains invalid path characters: \(address)")
+        }
+        return address
+    }
+
     /// Returns the file URL for a contact's data
-    private func contactURL(for address: String) -> URL {
-        directory.appendingPathComponent("\(address).contact.json")
+    private func contactURL(for address: String) throws -> URL {
+        let safe = try sanitizedFilename(for: address)
+        return directory.appendingPathComponent("\(safe).contact.json")
     }
 
     /// Returns the file URL for a contact's ratchet state
-    private func stateURL(for address: String) -> URL {
-        directory.appendingPathComponent("\(address).state.json")
+    private func stateURL(for address: String) throws -> URL {
+        let safe = try sanitizedFilename(for: address)
+        return directory.appendingPathComponent("\(safe).state.json")
     }
 }

@@ -294,8 +294,10 @@ public actor MessageIndexer {
                 return nil
             }
 
-            // Derive the PSK for this counter
-            let currentPSK = try await pskManager.validateReceive(
+            // Two-phase counter validation: validate and derive PSK first,
+            // then decrypt, then record the counter only on success.
+            // This prevents burning counters on failed decryptions.
+            let currentPSK = try await pskManager.validateAndDerivePSK(
                 from: peerAddress,
                 counter: envelope.ratchetCounter
             )
@@ -304,6 +306,11 @@ public actor MessageIndexer {
                 envelope: envelope,
                 recipientPrivateKey: chatAccount.encryptionPrivateKey,
                 currentPSK: currentPSK
+            )
+
+            try await pskManager.recordReceive(
+                from: peerAddress,
+                counter: envelope.ratchetCounter
             )
             protocolMode = .psk
         }

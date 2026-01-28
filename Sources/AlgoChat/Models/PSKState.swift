@@ -40,13 +40,16 @@ public struct PSKState: Sendable, Codable {
     // MARK: - Counter Operations
 
     /**
-     Validates and records a received counter value
+     Validates a received counter value without recording it
+
+     Call this before attempting decryption. If decryption succeeds,
+     call `recordReceive(_:)` to commit the counter.
 
      - Parameter counter: The received ratchet counter
      - Throws: `ChatError.pskCounterReplay` if the counter was already seen
      - Throws: `ChatError.pskCounterOutOfRange` if the counter is outside the acceptance window
      */
-    public mutating func validateAndRecordReceive(_ counter: UInt32) throws {
+    public func validateCounter(_ counter: UInt32) throws {
         // Check for replay
         if seenCounters.contains(counter) {
             throw ChatError.pskCounterReplay
@@ -65,15 +68,37 @@ public struct PSKState: Sendable, Codable {
         guard counter >= lowerBound && counter <= upperBound else {
             throw ChatError.pskCounterOutOfRange
         }
+    }
 
-        // Record and update
+    /**
+     Records a successfully decrypted counter value
+
+     Call this only after decryption succeeds to avoid burning
+     counters on failed decryptions.
+
+     - Parameter counter: The counter value to record
+     */
+    public mutating func recordReceive(_ counter: UInt32) {
         seenCounters.insert(counter)
         if counter > peerLastCounter {
             peerLastCounter = counter
         }
-
-        // Prune old seen counters outside the window
         pruneSeenCounters()
+    }
+
+    /**
+     Validates and records a received counter value
+
+     Convenience that combines `validateCounter` and `recordReceive`.
+     Use the two-phase API when decryption may fail between validation and recording.
+
+     - Parameter counter: The received ratchet counter
+     - Throws: `ChatError.pskCounterReplay` if the counter was already seen
+     - Throws: `ChatError.pskCounterOutOfRange` if the counter is outside the acceptance window
+     */
+    public mutating func validateAndRecordReceive(_ counter: UInt32) throws {
+        try validateCounter(counter)
+        recordReceive(counter)
     }
 
     /**
@@ -83,7 +108,7 @@ public struct PSKState: Sendable, Codable {
      */
     public mutating func advanceSendCounter() -> UInt32 {
         let current = sendCounter
-        sendCounter += 1
+        sendCounter &+= 1
         return current
     }
 

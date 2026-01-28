@@ -114,7 +114,10 @@ public actor PSKManager {
     }
 
     /**
-     Validates a received counter and returns the derived PSK
+     Validates a received counter and derives the PSK without recording
+
+     Call `recordReceive(from:counter:)` after successful decryption
+     to commit the counter. This prevents burning counters on failed decryptions.
 
      - Parameters:
        - address: The sender's Algorand address
@@ -122,22 +125,33 @@ public actor PSKManager {
      - Returns: The derived PSK for this counter
      - Throws: `ChatError.pskNotFound`, `ChatError.pskCounterReplay`, or `ChatError.pskCounterOutOfRange`
      */
-    public func validateReceive(from address: String, counter: UInt32) async throws -> Data {
+    public func validateAndDerivePSK(from address: String, counter: UInt32) async throws -> Data {
         let contact = try await getContact(for: address)
-        var state = try await getState(for: address)
+        let state = try await getState(for: address)
 
-        try state.validateAndRecordReceive(counter)
+        try state.validateCounter(counter)
 
-        let currentPSK = PSKRatchet.derivePSKAtCounter(
+        return PSKRatchet.derivePSKAtCounter(
             initialPSK: contact.initialPSK,
             counter: counter
         )
+    }
 
-        // Persist the updated state
+    /**
+     Records a successfully decrypted counter value
+
+     Call this after decryption succeeds to commit the counter
+     and persist the updated state.
+
+     - Parameters:
+       - address: The sender's Algorand address
+       - counter: The received ratchet counter
+     */
+    public func recordReceive(from address: String, counter: UInt32) async throws {
+        var state = try await getState(for: address)
+        state.recordReceive(counter)
         try await storage.storeState(state, for: address)
         stateCache[address] = state
-
-        return currentPSK
     }
 
     /**
