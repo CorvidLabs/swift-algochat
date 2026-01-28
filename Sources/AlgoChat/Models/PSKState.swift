@@ -39,11 +39,13 @@ public struct PSKState: Sendable, Codable {
 
     // MARK: - Counter Operations
 
-    /// Validates and records a received counter value
-    ///
-    /// - Parameter counter: The received ratchet counter
-    /// - Throws: `ChatError.pskCounterReplay` if the counter was already seen
-    /// - Throws: `ChatError.pskCounterOutOfRange` if the counter is outside the acceptance window
+    /**
+     Validates and records a received counter value
+
+     - Parameter counter: The received ratchet counter
+     - Throws: `ChatError.pskCounterReplay` if the counter was already seen
+     - Throws: `ChatError.pskCounterOutOfRange` if the counter is outside the acceptance window
+     */
     public mutating func validateAndRecordReceive(_ counter: UInt32) throws {
         // Check for replay
         if seenCounters.contains(counter) {
@@ -74,9 +76,11 @@ public struct PSKState: Sendable, Codable {
         pruneSeenCounters()
     }
 
-    /// Advances the send counter and returns the current value
-    ///
-    /// - Returns: The counter value to use for the next send
+    /**
+     Advances the send counter and returns the current value
+
+     - Returns: The counter value to use for the next send
+     */
     public mutating func advanceSendCounter() -> UInt32 {
         let current = sendCounter
         sendCounter += 1

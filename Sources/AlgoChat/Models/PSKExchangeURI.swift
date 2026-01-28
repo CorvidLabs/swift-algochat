@@ -1,9 +1,11 @@
 import Foundation
 
-/// Represents a PSK exchange URI for out-of-band key exchange
-///
-/// Format: `algochat-psk://v1?addr=...&psk=...&label=...`
-/// The PSK is encoded using base64url (RFC 4648).
+/**
+ Represents a PSK exchange URI for out-of-band key exchange
+
+ Format: `algochat-psk://v1?addr=...&psk=...&label=...`
+ The PSK is encoded using base64url (RFC 4648).
+ */
 public struct PSKExchangeURI: Sendable, Equatable {
     /// The contact's Algorand address
     public let address: String
@@ -16,12 +18,14 @@ public struct PSKExchangeURI: Sendable, Equatable {
 
     // MARK: - Initialization
 
-    /// Creates a new PSK exchange URI
-    ///
-    /// - Parameters:
-    ///   - address: The Algorand address
-    ///   - psk: The 32-byte pre-shared key
-    ///   - label: Optional human-readable label
+    /**
+     Creates a new PSK exchange URI
+
+     - Parameters:
+       - address: The Algorand address
+       - psk: The 32-byte pre-shared key
+       - label: Optional human-readable label
+     */
     public init(address: String, psk: Data, label: String? = nil) {
         precondition(psk.count == 32, "PSK must be 32 bytes")
         self.address = address
@@ -52,11 +56,13 @@ public struct PSKExchangeURI: Sendable, Equatable {
 
     // MARK: - Parsing
 
-    /// Parses a PSK exchange URI string
-    ///
-    /// - Parameter string: The URI string to parse
-    /// - Returns: A parsed PSKExchangeURI
-    /// - Throws: `ChatError.invalidEnvelope` if the URI is invalid
+    /**
+     Parses a PSK exchange URI string
+
+     - Parameter string: The URI string to parse
+     - Returns: A parsed PSKExchangeURI
+     - Throws: `ChatError.invalidEnvelope` if the URI is invalid
+     */
     public static func parse(_ string: String) throws -> PSKExchangeURI {
         guard let components = URLComponents(string: string) else {
             throw ChatError.invalidEnvelope("Invalid PSK exchange URI")

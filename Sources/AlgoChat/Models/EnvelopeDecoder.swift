@@ -1,8 +1,10 @@
 import Foundation
 
-/// Unified entry point for decoding encrypted envelopes
-///
-/// Inspects the protocol byte and dispatches to the correct envelope type.
+/**
+ Unified entry point for decoding encrypted envelopes
+
+ Inspects the protocol byte and dispatches to the correct envelope type.
+ */
 public enum EnvelopeDecoder {
     /// A decoded envelope, either standard or PSK
     public enum DecodedEnvelope: Sendable {
@@ -13,11 +15,13 @@ public enum EnvelopeDecoder {
         case psk(PSKEnvelope)
     }
 
-    /// Decodes raw data into the appropriate envelope type
-    ///
-    /// - Parameter data: The raw envelope bytes
-    /// - Returns: A decoded envelope
-    /// - Throws: `ChatError` if the data is invalid
+    /**
+     Decodes raw data into the appropriate envelope type
+
+     - Parameter data: The raw envelope bytes
+     - Returns: A decoded envelope
+     - Throws: `ChatError` if the data is invalid
+     */
     public static func decode(from data: Data) throws -> DecodedEnvelope {
         guard data.count >= 2 else {
             throw ChatError.invalidEnvelope("Data too short: \(data.count) bytes")
@@ -39,10 +43,12 @@ public enum EnvelopeDecoder {
         }
     }
 
-    /// Checks if raw data is a valid AlgoChat message (either standard or PSK)
-    ///
-    /// - Parameter data: The raw data to check
-    /// - Returns: true if this is a recognized AlgoChat envelope
+    /**
+     Checks if raw data is a valid AlgoChat message (either standard or PSK)
+
+     - Parameter data: The raw data to check
+     - Returns: true if this is a recognized AlgoChat envelope
+     */
     public static func isChatMessage(_ data: Data) -> Bool {
         guard data.count >= 2 else { return false }
         let version = data[0]

@@ -407,9 +407,11 @@ public actor AlgoChat {
         return SendResult(txid: txid, message: sentMessage)
     }
 
-    /// Sends a message to an address (convenience for one-off messages)
-    ///
-    /// For persistent messaging, use `conversation(with:)` and `send(_:to:options:)`.
+    /**
+     Sends a message to an address (convenience for one-off messages)
+
+     For persistent messaging, use `conversation(with:)` and `send(_:to:options:)`.
+     */
     @discardableResult
     public func send(
         _ message: String,
@@ -591,16 +593,20 @@ public actor AlgoChat {
         try await pskManager.addContact(contact)
     }
 
-    /// Adds a PSK contact from a PSK exchange URI
-    ///
-    /// - Parameter uri: The parsed PSK exchange URI
+    /**
+     Adds a PSK contact from a PSK exchange URI
+
+     - Parameter uri: The parsed PSK exchange URI
+     */
     public func addPSKContact(uri: PSKExchangeURI) async throws {
         try await addPSKContact(address: uri.address, psk: uri.psk, label: uri.label)
     }
 
-    /// Removes a PSK contact
-    ///
-    /// - Parameter address: The Algorand address to remove
+    /**
+     Removes a PSK contact
+
+     - Parameter address: The Algorand address to remove
+     */
     public func removePSKContact(for address: String) async throws {
         guard let pskManager else {
             throw ChatError.pskNotFound("PSK manager not configured")
@@ -608,29 +614,35 @@ public actor AlgoChat {
         try await pskManager.removeContact(for: address)
     }
 
-    /// Checks if a PSK contact exists
-    ///
-    /// - Parameter address: The Algorand address to check
-    /// - Returns: true if a PSK contact exists
+    /**
+     Checks if a PSK contact exists
+
+     - Parameter address: The Algorand address to check
+     - Returns: true if a PSK contact exists
+     */
     public func hasPSKContact(for address: String) async -> Bool {
         guard let pskManager else { return false }
         return await pskManager.hasContact(for: address)
     }
 
-    /// Lists all PSK contacts
-    ///
-    /// - Returns: Array of PSK contacts
+    /**
+     Lists all PSK contacts
+
+     - Returns: Array of PSK contacts
+     */
     public func pskContacts() async throws -> [PSKContact] {
         guard let pskManager else { return [] }
         return try await pskManager.listContacts()
     }
 
-    /// Generates a PSK exchange URI for sharing with another user
-    ///
-    /// - Parameters:
-    ///   - psk: The 32-byte pre-shared key to share
-    ///   - label: Optional label for the contact
-    /// - Returns: A PSK exchange URI
+    /**
+     Generates a PSK exchange URI for sharing with another user
+
+     - Parameters:
+       - psk: The 32-byte pre-shared key to share
+       - label: Optional label for the contact
+     - Returns: A PSK exchange URI
+     */
     public func generatePSKExchangeURI(psk: Data, label: String? = nil) -> PSKExchangeURI {
         PSKExchangeURI(address: account.address.description, psk: psk, label: label)
     }

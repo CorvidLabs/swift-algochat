@@ -1,10 +1,12 @@
 import Foundation
 
-/// File-based PSK storage using JSON files
-///
-/// Stores contacts and state as JSON files in the AlgoChat storage directory:
-/// - `{address}.contact.json` for contact information
-/// - `{address}.state.json` for ratchet state
+/**
+ File-based PSK storage using JSON files
+
+ Stores contacts and state as JSON files in the AlgoChat storage directory:
+ - `{address}.contact.json` for contact information
+ - `{address}.state.json` for ratchet state
+ */
 public actor FilePSKStorage: PSKStorage {
     // MARK: - Properties
 
@@ -28,10 +30,12 @@ public actor FilePSKStorage: PSKStorage {
 
     // MARK: - Initialization
 
-    /// Creates a file-based PSK storage
-    ///
-    /// - Parameter directoryName: The storage directory name (defaults to ".algochat")
-    /// - Throws: If the directory cannot be created
+    /**
+     Creates a file-based PSK storage
+
+     - Parameter directoryName: The storage directory name (defaults to ".algochat")
+     - Throws: If the directory cannot be created
+     */
     public init(directoryName: String = StorageDirectory.defaultDirectoryName) throws {
         let baseDir = try StorageDirectory.resolve(name: directoryName)
         self.directory = baseDir.appendingPathComponent("psk")

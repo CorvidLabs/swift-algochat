@@ -14,13 +14,15 @@ public struct PSKContact: Sendable, Codable, Equatable {
     /// When the contact was created
     public let createdAt: Date
 
-    /// Creates a new PSK contact
-    ///
-    /// - Parameters:
-    ///   - address: The contact's Algorand address
-    ///   - initialPSK: The 32-byte pre-shared key
-    ///   - label: Optional human-readable label
-    ///   - createdAt: Creation date (defaults to now)
+    /**
+     Creates a new PSK contact
+
+     - Parameters:
+       - address: The contact's Algorand address
+       - initialPSK: The 32-byte pre-shared key
+       - label: Optional human-readable label
+       - createdAt: Creation date (defaults to now)
+     */
     public init(
         address: String,
         initialPSK: Data,

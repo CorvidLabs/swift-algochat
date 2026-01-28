@@ -15,18 +15,22 @@ public actor PSKManager {
 
     // MARK: - Initialization
 
-    /// Creates a new PSK manager with the given storage backend
-    ///
-    /// - Parameter storage: The PSK storage implementation
+    /**
+     Creates a new PSK manager with the given storage backend
+
+     - Parameter storage: The PSK storage implementation
+     */
     public init(storage: any PSKStorage) {
         self.storage = storage
     }
 
     // MARK: - Contact Management
 
-    /// Adds a PSK contact
-    ///
-    /// - Parameter contact: The PSK contact to add
+    /**
+     Adds a PSK contact
+
+     - Parameter contact: The PSK contact to add
+     */
     public func addContact(_ contact: PSKContact) async throws {
         try await storage.storeContact(contact)
         contactCache[contact.address] = contact
@@ -38,19 +42,23 @@ public actor PSKManager {
         }
     }
 
-    /// Removes a PSK contact and its associated state
-    ///
-    /// - Parameter address: The Algorand address to remove
+    /**
+     Removes a PSK contact and its associated state
+
+     - Parameter address: The Algorand address to remove
+     */
     public func removeContact(for address: String) async throws {
         try await storage.deleteContact(for: address)
         contactCache.removeValue(forKey: address)
         stateCache.removeValue(forKey: address)
     }
 
-    /// Checks if a PSK contact exists for the given address
-    ///
-    /// - Parameter address: The Algorand address to check
-    /// - Returns: true if a contact exists
+    /**
+     Checks if a PSK contact exists for the given address
+
+     - Parameter address: The Algorand address to check
+     - Returns: true if a contact exists
+     */
     public func hasContact(for address: String) async -> Bool {
         if contactCache[address] != nil {
             return true
@@ -63,11 +71,13 @@ public actor PSKManager {
         return false
     }
 
-    /// Gets a PSK contact for the given address
-    ///
-    /// - Parameter address: The Algorand address
-    /// - Returns: The PSK contact
-    /// - Throws: `ChatError.pskNotFound` if no contact exists
+    /**
+     Gets a PSK contact for the given address
+
+     - Parameter address: The Algorand address
+     - Returns: The PSK contact
+     - Throws: `ChatError.pskNotFound` if no contact exists
+     */
     public func getContact(for address: String) async throws -> PSKContact {
         if let cached = contactCache[address] {
             return cached
@@ -79,11 +89,13 @@ public actor PSKManager {
         return contact
     }
 
-    /// Gets the next send counter and derived PSK for a contact
-    ///
-    /// - Parameter address: The Algorand address
-    /// - Returns: Tuple of (counter, currentPSK) to use for the next send
-    /// - Throws: `ChatError.pskNotFound` if no contact exists
+    /**
+     Gets the next send counter and derived PSK for a contact
+
+     - Parameter address: The Algorand address
+     - Returns: Tuple of (counter, currentPSK) to use for the next send
+     - Throws: `ChatError.pskNotFound` if no contact exists
+     */
     public func nextSendCounter(for address: String) async throws -> (counter: UInt32, currentPSK: Data) {
         let contact = try await getContact(for: address)
         var state = try await getState(for: address)
@@ -101,13 +113,15 @@ public actor PSKManager {
         return (counter: counter, currentPSK: currentPSK)
     }
 
-    /// Validates a received counter and returns the derived PSK
-    ///
-    /// - Parameters:
-    ///   - address: The sender's Algorand address
-    ///   - counter: The received ratchet counter
-    /// - Returns: The derived PSK for this counter
-    /// - Throws: `ChatError.pskNotFound`, `ChatError.pskCounterReplay`, or `ChatError.pskCounterOutOfRange`
+    /**
+     Validates a received counter and returns the derived PSK
+
+     - Parameters:
+       - address: The sender's Algorand address
+       - counter: The received ratchet counter
+     - Returns: The derived PSK for this counter
+     - Throws: `ChatError.pskNotFound`, `ChatError.pskCounterReplay`, or `ChatError.pskCounterOutOfRange`
+     */
     public func validateReceive(from address: String, counter: UInt32) async throws -> Data {
         let contact = try await getContact(for: address)
         var state = try await getState(for: address)
@@ -126,9 +140,11 @@ public actor PSKManager {
         return currentPSK
     }
 
-    /// Lists all PSK contacts
-    ///
-    /// - Returns: Array of all PSK contacts
+    /**
+     Lists all PSK contacts
+
+     - Returns: Array of all PSK contacts
+     */
     public func listContacts() async throws -> [PSKContact] {
         try await storage.listContacts()
     }
