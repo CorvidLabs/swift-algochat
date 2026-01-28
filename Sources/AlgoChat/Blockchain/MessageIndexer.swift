@@ -8,12 +8,16 @@ public actor MessageIndexer {
     private let indexerClient: IndexerClient
     private let chatAccount: ChatAccount
 
+    /// Optional PSK manager for decrypting PSK messages
+    private let pskManager: PSKManager?
+
     /// Default page size for fetching messages
     public static let defaultPageSize = 50
 
-    public init(indexerClient: IndexerClient, chatAccount: ChatAccount) {
+    public init(indexerClient: IndexerClient, chatAccount: ChatAccount, pskManager: PSKManager? = nil) {
         self.indexerClient = indexerClient
         self.chatAccount = chatAccount
+        self.pskManager = pskManager
     }
 
     /**
@@ -71,7 +75,7 @@ public actor MessageIndexer {
             }
 
             // Try to parse and decrypt the message
-            if let message = try? parseMessage(from: tx, direction: direction) {
+            if let message = try? await parseMessage(from: tx, direction: direction) {
                 allMessages.append(message)
             }
         }
@@ -121,7 +125,7 @@ public actor MessageIndexer {
             }
 
             // Parse and add message
-            if let message = try? parseMessage(from: tx, direction: direction) {
+            if let message = try? await parseMessage(from: tx, direction: direction) {
                 if var conversation = conversationsByAddress[otherAddress] {
                     conversation.append(message)
                     conversationsByAddress[otherAddress] = conversation
@@ -169,11 +173,20 @@ public actor MessageIndexer {
                 continue
             }
 
-            guard let envelope = try? ChatEnvelope.decode(from: noteData) else {
+            // Try to decode as either standard or PSK envelope
+            guard let decoded = try? EnvelopeDecoder.decode(from: noteData) else {
                 continue
             }
 
-            let publicKey = try KeyDerivation.decodePublicKey(from: envelope.senderPublicKey)
+            let senderPublicKeyData: Data
+            switch decoded {
+            case .standard(let envelope):
+                senderPublicKeyData = envelope.senderPublicKey
+            case .psk(let envelope):
+                senderPublicKeyData = envelope.senderPublicKey
+            }
+
+            let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
             return DiscoveredKey(publicKey: publicKey, isVerified: true)
         }
 
@@ -240,27 +253,60 @@ public actor MessageIndexer {
     // MARK: - Private
 
     private func isChatMessage(_ data: Data) -> Bool {
-        guard data.count >= 2 else { return false }
-        return data[0] == ChatEnvelope.version && data[1] == ChatEnvelope.protocolID
+        EnvelopeDecoder.isChatMessage(data)
     }
 
     private func parseMessage(
         from tx: IndexerTransaction,
         direction: Message.Direction
-    ) throws -> Message? {
+    ) async throws -> Message? {
         guard let noteData = tx.noteData else {
             throw ChatError.invalidEnvelope("No note data")
         }
 
-        let envelope = try ChatEnvelope.decode(from: noteData)
+        let decoded = try EnvelopeDecoder.decode(from: noteData)
 
-        // Decrypt the message (returns structured content with optional reply metadata)
-        // Returns nil for key-publish payloads, which should be filtered out
-        // The decrypt function automatically detects sender vs recipient and uses the appropriate path
-        let decrypted = try MessageEncryptor.decrypt(
-            envelope: envelope,
-            recipientPrivateKey: chatAccount.encryptionPrivateKey
-        )
+        let decrypted: DecryptedContent?
+        let protocolMode: Message.ProtocolMode
+
+        switch decoded {
+        case .standard(let envelope):
+            decrypted = try MessageEncryptor.decrypt(
+                envelope: envelope,
+                recipientPrivateKey: chatAccount.encryptionPrivateKey
+            )
+            protocolMode = .standard
+
+        case .psk(let envelope):
+            // Determine the peer address for PSK lookup
+            let peerAddress: String
+            if direction == .sent {
+                guard let payment = tx.paymentTransaction else {
+                    throw ChatError.invalidEnvelope("Not a payment transaction")
+                }
+                peerAddress = payment.receiver
+            } else {
+                peerAddress = tx.sender
+            }
+
+            guard let pskManager else {
+                // No PSK manager configured - skip PSK messages
+                return nil
+            }
+
+            // Derive the PSK for this counter
+            let currentPSK = try await pskManager.validateReceive(
+                from: peerAddress,
+                counter: envelope.ratchetCounter
+            )
+
+            decrypted = try MessageEncryptor.decryptPSK(
+                envelope: envelope,
+                recipientPrivateKey: chatAccount.encryptionPrivateKey,
+                currentPSK: currentPSK
+            )
+            protocolMode = .psk
+        }
 
         guard let decrypted else {
             // Key-publish payload - not a real message
@@ -297,7 +343,8 @@ public actor MessageIndexer {
             timestamp: timestamp,
             confirmedRound: tx.confirmedRound ?? 0,
             direction: direction,
-            replyContext: replyContext
+            replyContext: replyContext,
+            protocolMode: protocolMode
         )
     }
 }

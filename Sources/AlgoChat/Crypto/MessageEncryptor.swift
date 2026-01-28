@@ -312,6 +312,287 @@ public enum MessageEncryptor {
         return try ChaChaPoly.open(sealedBox, using: symmetricKey)
     }
 
+    // MARK: - PSK Encryption
+
+    /**
+     Encrypts a message using PSK mode (protocol v1.1)
+
+     Uses hybrid PSK + ephemeral ECDH for key derivation. Both sender and
+     recipient must share a pre-shared key for this mode.
+
+     - Parameters:
+       - message: The plaintext message
+       - senderPrivateKey: Sender's static X25519 private key
+       - recipientPublicKey: Recipient's X25519 public key
+       - currentPSK: The derived PSK for the current ratchet counter
+       - ratchetCounter: The ratchet counter value
+     - Returns: PSKEnvelope containing encrypted data
+     */
+    public static func encryptPSK(
+        message: String,
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
+        currentPSK: Data,
+        ratchetCounter: UInt32
+    ) throws -> PSKEnvelope {
+        guard let messageData = message.data(using: .utf8) else {
+            throw ChatError.encodingFailed("Failed to encode message as UTF-8")
+        }
+        return try encryptDataPSK(
+            messageData,
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPublicKey,
+            currentPSK: currentPSK,
+            ratchetCounter: ratchetCounter
+        )
+    }
+
+    /**
+     Encrypts a reply message using PSK mode (protocol v1.1)
+
+     - Parameters:
+       - message: The reply text
+       - replyTo: Tuple of original transaction ID and preview text
+       - senderPrivateKey: Sender's X25519 private key
+       - recipientPublicKey: Recipient's X25519 public key
+       - currentPSK: The derived PSK for the current ratchet counter
+       - ratchetCounter: The ratchet counter value
+     - Returns: PSKEnvelope containing encrypted data
+     */
+    public static func encryptPSK(
+        message: String,
+        replyTo: (txid: String, preview: String),
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
+        currentPSK: Data,
+        ratchetCounter: UInt32
+    ) throws -> PSKEnvelope {
+        let payload = MessagePayload.reply(
+            text: message,
+            originalTxid: replyTo.txid,
+            originalPreview: replyTo.preview
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let payloadData = try encoder.encode(payload)
+
+        return try encryptDataPSK(
+            payloadData,
+            senderPrivateKey: senderPrivateKey,
+            recipientPublicKey: recipientPublicKey,
+            currentPSK: currentPSK,
+            ratchetCounter: ratchetCounter
+        )
+    }
+
+    // MARK: - PSK Decryption
+
+    /**
+     Decrypts a PSK envelope and returns structured content
+
+     Automatically detects whether the caller is the sender or recipient
+     and uses the appropriate decryption path. Returns nil for key-publish payloads.
+
+     - Parameters:
+       - envelope: The encrypted PSK envelope
+       - recipientPrivateKey: The decryptor's X25519 private key (sender or recipient)
+       - currentPSK: The derived PSK for the envelope's ratchet counter
+     - Returns: DecryptedContent with text and optional reply metadata, or nil for key-publish
+     */
+    public static func decryptPSK(
+        envelope: PSKEnvelope,
+        recipientPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        currentPSK: Data
+    ) throws -> DecryptedContent? {
+        // Reconstruct ephemeral public key
+        let ephemeralPublicKey = try Curve25519.KeyAgreement.PublicKey(
+            rawRepresentation: envelope.ephemeralPublicKey
+        )
+
+        // Check if we're the sender
+        let weAreTheSender = recipientPrivateKey.publicKey.rawRepresentation == envelope.senderPublicKey
+
+        let plaintext: Data
+        if weAreTheSender {
+            // Sender decryption path: recover symmetric key from encrypted sender key
+            plaintext = try decryptDataPSK(
+                envelope: envelope,
+                senderPrivateKey: recipientPrivateKey,
+                ephemeralPublicKey: ephemeralPublicKey,
+                currentPSK: currentPSK
+            )
+        } else {
+            // Recipient decryption path: derive symmetric key using hybrid derivation
+            let sharedSecret = try recipientPrivateKey.sharedSecretFromKeyAgreement(
+                with: ephemeralPublicKey
+            )
+
+            let symmetricKey = PSKRatchet.deriveHybridSymmetricKey(
+                sharedSecret: sharedSecret,
+                currentPSK: currentPSK,
+                ephemeralPublicKey: envelope.ephemeralPublicKey,
+                senderPublicKey: envelope.senderPublicKey,
+                recipientPublicKey: recipientPrivateKey.publicKey.rawRepresentation
+            )
+
+            plaintext = try decryptPSKWithKey(envelope: envelope, symmetricKey: symmetricKey)
+        }
+
+        // Check for key-publish payload
+        if KeyPublishPayload.isKeyPublish(plaintext) {
+            return nil
+        }
+
+        // Try to parse as structured payload
+        if plaintext.first == UInt8(ascii: "{"),
+           let payload = try? JSONDecoder().decode(MessagePayload.self, from: plaintext) {
+            return DecryptedContent(
+                text: payload.text,
+                replyToId: payload.replyTo?.txid,
+                replyToPreview: payload.replyTo?.preview
+            )
+        }
+
+        // Plain text message
+        guard let message = String(data: plaintext, encoding: .utf8) else {
+            throw ChatError.decryptionFailed("Decrypted data is not valid UTF-8")
+        }
+
+        return DecryptedContent(text: message)
+    }
+
+    // MARK: - Internal PSK Encryption
+
+    /// Encrypts raw data using PSK mode with hybrid key derivation
+    private static func encryptDataPSK(
+        _ data: Data,
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        recipientPublicKey: Curve25519.KeyAgreement.PublicKey,
+        currentPSK: Data,
+        ratchetCounter: UInt32
+    ) throws -> PSKEnvelope {
+        guard data.count <= PSKEnvelope.maxPayloadSize else {
+            throw ChatError.messageTooLarge(maxSize: PSKEnvelope.maxPayloadSize)
+        }
+
+        // Generate ephemeral key pair for this message
+        let ephemeralPrivateKey = ephemeralKeyManager.generateKeyPair()
+
+        // Derive symmetric key using hybrid PSK + ECDH
+        let sharedSecret = try ephemeralPrivateKey.sharedSecretFromKeyAgreement(
+            with: recipientPublicKey
+        )
+
+        let symmetricKey = PSKRatchet.deriveHybridSymmetricKey(
+            sharedSecret: sharedSecret,
+            currentPSK: currentPSK,
+            ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
+            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation,
+            recipientPublicKey: recipientPublicKey.rawRepresentation
+        )
+
+        // Generate random nonce
+        let nonceBytes = try generateRandomBytes(count: 12)
+        let nonce = try ChaChaPoly.Nonce(data: Data(nonceBytes))
+
+        // Encrypt message
+        let sealedBox = try ChaChaPoly.seal(data, using: symmetricKey, nonce: nonce)
+        let ciphertextWithTag = sealedBox.ciphertext + sealedBox.tag
+
+        // Encrypt the symmetric key for the sender using PSK-enhanced sender key derivation
+        let senderSharedSecret = try ephemeralPrivateKey.sharedSecretFromKeyAgreement(
+            with: senderPrivateKey.publicKey
+        )
+
+        let senderEncryptionKey = PSKRatchet.deriveSenderKey(
+            senderSharedSecret: senderSharedSecret,
+            currentPSK: currentPSK,
+            ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
+            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation
+        )
+
+        let symmetricKeyData = symmetricKey.withUnsafeBytes { Data($0) }
+        let senderSealedBox = try ChaChaPoly.seal(symmetricKeyData, using: senderEncryptionKey, nonce: nonce)
+        let encryptedSenderKey = senderSealedBox.ciphertext + senderSealedBox.tag
+
+        return PSKEnvelope(
+            ratchetCounter: ratchetCounter,
+            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation,
+            ephemeralPublicKey: ephemeralPrivateKey.publicKey.rawRepresentation,
+            nonce: Data(nonceBytes),
+            encryptedSenderKey: encryptedSenderKey,
+            ciphertext: ciphertextWithTag
+        )
+    }
+
+    // MARK: - Internal PSK Sender Decryption
+
+    /// Decrypts a PSK envelope using the sender's private key
+    private static func decryptDataPSK(
+        envelope: PSKEnvelope,
+        senderPrivateKey: Curve25519.KeyAgreement.PrivateKey,
+        ephemeralPublicKey: Curve25519.KeyAgreement.PublicKey,
+        currentPSK: Data
+    ) throws -> Data {
+        // Derive the sender decryption key using PSK-enhanced derivation
+        let senderSharedSecret = try senderPrivateKey.sharedSecretFromKeyAgreement(
+            with: ephemeralPublicKey
+        )
+
+        let senderDecryptionKey = PSKRatchet.deriveSenderKey(
+            senderSharedSecret: senderSharedSecret,
+            currentPSK: currentPSK,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            senderPublicKey: senderPrivateKey.publicKey.rawRepresentation
+        )
+
+        // Decrypt the symmetric key
+        let keyNonce = try ChaChaPoly.Nonce(data: envelope.nonce)
+        let keyCiphertextLength = envelope.encryptedSenderKey.count - PSKEnvelope.tagSize
+        guard keyCiphertextLength == 32 else {
+            throw ChatError.decryptionFailed("Invalid encrypted sender key length")
+        }
+        let keyCiphertext = envelope.encryptedSenderKey.prefix(keyCiphertextLength)
+        let keyTag = envelope.encryptedSenderKey.suffix(PSKEnvelope.tagSize)
+
+        let keySealedBox = try ChaChaPoly.SealedBox(
+            nonce: keyNonce,
+            ciphertext: keyCiphertext,
+            tag: keyTag
+        )
+        let symmetricKeyData = try ChaChaPoly.open(keySealedBox, using: senderDecryptionKey)
+
+        // Use the recovered symmetric key to decrypt the message
+        let symmetricKey = SymmetricKey(data: symmetricKeyData)
+        return try decryptPSKWithKey(envelope: envelope, symmetricKey: symmetricKey)
+    }
+
+    // MARK: - Common PSK Decryption
+
+    /// Decrypts PSK envelope ciphertext using the provided symmetric key
+    private static func decryptPSKWithKey(
+        envelope: PSKEnvelope,
+        symmetricKey: SymmetricKey
+    ) throws -> Data {
+        let ciphertextLength = envelope.ciphertext.count - PSKEnvelope.tagSize
+        guard ciphertextLength >= 0 else {
+            throw ChatError.decryptionFailed("Ciphertext too short")
+        }
+
+        let ciphertext = envelope.ciphertext.prefix(ciphertextLength)
+        let tag = envelope.ciphertext.suffix(PSKEnvelope.tagSize)
+
+        let nonce = try ChaChaPoly.Nonce(data: envelope.nonce)
+        let sealedBox = try ChaChaPoly.SealedBox(
+            nonce: nonce,
+            ciphertext: ciphertext,
+            tag: tag
+        )
+
+        return try ChaChaPoly.open(sealedBox, using: symmetricKey)
+    }
+
     // MARK: - Helpers
 
     /// Generates cryptographically secure random bytes

@@ -55,6 +55,18 @@ public struct Message: Sendable, Identifiable, Codable {
     /// Reply context if this message is a reply
     public let replyContext: ReplyContext?
 
+    /// The protocol mode used for this message
+    public enum ProtocolMode: String, Sendable, Codable {
+        /// Standard mode (protocol 0x01)
+        case standard
+
+        /// PSK ratcheting mode (protocol 0x02)
+        case psk
+    }
+
+    /// The protocol mode used for this message (nil for backward compat)
+    public let protocolMode: ProtocolMode?
+
     public init(
         id: String,
         sender: Address,
@@ -63,7 +75,8 @@ public struct Message: Sendable, Identifiable, Codable {
         timestamp: Date,
         confirmedRound: UInt64,
         direction: Direction,
-        replyContext: ReplyContext? = nil
+        replyContext: ReplyContext? = nil,
+        protocolMode: ProtocolMode? = nil
     ) {
         self.id = id
         self.sender = sender
@@ -73,6 +86,7 @@ public struct Message: Sendable, Identifiable, Codable {
         self.confirmedRound = confirmedRound
         self.direction = direction
         self.replyContext = replyContext
+        self.protocolMode = protocolMode
     }
 
     /// Whether this message is a reply to another message

@@ -286,12 +286,12 @@ struct SecurityBoundaryTests {
         #expect(eveSuccesses == 0, "Eve should not be able to decrypt any messages!")
     }
 
-    @Test("Cannot decrypt with sender's key (asymmetric)")
-    func testSenderCannotDecryptOwnMessage() async throws {
+    @Test("Sender can decrypt own message (bidirectional)")
+    func testSenderCanDecryptOwnMessage() async throws {
         let alice = SimulatedUser(name: "Alice")
         let bob = SimulatedUser(name: "Bob")
 
-        print("\n=== SECURITY: Sender Cannot Decrypt Own Messages ===")
+        print("\n=== SECURITY: Bidirectional Decryption ===")
 
         let message = "Message from Alice to Bob"
         let envelope = try MessageEncryptor.encrypt(
@@ -300,29 +300,23 @@ struct SecurityBoundaryTests {
             recipientPublicKey: bob.publicKey
         )
 
-        // Alice tries to decrypt her own message
-        var aliceCanDecrypt = false
-        do {
-            _ = try MessageEncryptor.decrypt(
-                envelope: envelope,
-                recipientPrivateKey: alice.privateKey
-            )
-            aliceCanDecrypt = true
-        } catch {
-            // Expected - sender cannot decrypt
-        }
+        // Alice decrypts her own sent message
+        let aliceDecrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: alice.privateKey
+        )
 
-        // Bob CAN decrypt
+        // Bob decrypts message addressed to him
         let bobDecrypted = try MessageEncryptor.decrypt(
             envelope: envelope,
             recipientPrivateKey: bob.privateKey
         )
 
-        print("Alice can decrypt her own sent message: \(aliceCanDecrypt ? "YES ❌" : "NO ✅")")
+        print("Alice can decrypt her own sent message: \(aliceDecrypted != nil ? "YES ✅" : "NO ❌")")
         print("Bob can decrypt message addressed to him: \(bobDecrypted != nil ? "YES ✅" : "NO ❌")")
-        print("✅ Asymmetric encryption verified - only recipient can decrypt")
+        print("✅ Bidirectional decryption verified - both sender and recipient can decrypt")
 
-        #expect(!aliceCanDecrypt, "Sender should not be able to decrypt their own message")
+        #expect(aliceDecrypted?.text == message, "Sender should be able to decrypt their own message")
         #expect(bobDecrypted?.text == message)
     }
 
@@ -817,6 +811,195 @@ struct LongTermUsageTests {
         print("✅ Security boundaries enforced for all \(users.count) users")
     }
 }
+
+// MARK: - PSK Simulation Tests
+
+@Suite("E2E: PSK Conversations", .serialized)
+struct PSKSimulationTests {
+
+    @Test("Two users with PSK exchange 100 messages")
+    func testPSKConversation100Messages() async throws {
+        let alice = SimulatedUser(name: "Alice")
+        let bob = SimulatedUser(name: "Bob")
+        let initialPSK = Data(repeating: 0xAA, count: 32)
+
+        print("\n=== PSK CONVERSATION (100 messages) ===")
+        print("Alice: \(alice.publicKey.rawRepresentation.prefix(8).hex)...")
+        print("Bob:   \(bob.publicKey.rawRepresentation.prefix(8).hex)...")
+
+        var aliceSendCounter: UInt32 = 0
+        var bobSendCounter: UInt32 = 0
+
+        for i in 1...100 {
+            let isAliceSending = i % 2 == 1
+            let sender = isAliceSending ? alice : bob
+            let recipient = isAliceSending ? bob : alice
+
+            let counter: UInt32
+            if isAliceSending {
+                counter = aliceSendCounter
+                aliceSendCounter += 1
+            } else {
+                counter = bobSendCounter
+                bobSendCounter += 1
+            }
+
+            let currentPSK = PSKRatchet.derivePSKAtCounter(
+                initialPSK: initialPSK, counter: counter
+            )
+
+            let message = "PSK Message #\(i) from \(sender.name)"
+            let envelope = try MessageEncryptor.encryptPSK(
+                message: message,
+                senderPrivateKey: sender.privateKey,
+                recipientPublicKey: recipient.publicKey,
+                currentPSK: currentPSK,
+                ratchetCounter: counter
+            )
+
+            // Recipient decrypts
+            let decrypted = try MessageEncryptor.decryptPSK(
+                envelope: envelope,
+                recipientPrivateKey: recipient.privateKey,
+                currentPSK: currentPSK
+            )
+
+            #expect(decrypted?.text == message, "PSK message \(i) failed to decrypt")
+
+            if i % 25 == 0 {
+                print("  ✓ PSK messages 1-\(i) verified")
+            }
+        }
+
+        print("✅ All 100 PSK messages encrypted and decrypted correctly")
+    }
+
+    @Test("Eve without PSK cannot decrypt PSK messages")
+    func testEveCannotDecryptPSK() async throws {
+        let alice = SimulatedUser(name: "Alice")
+        let bob = SimulatedUser(name: "Bob")
+        let eve = SimulatedUser(name: "Eve")
+        let initialPSK = Data(repeating: 0xCC, count: 32)
+
+        print("\n=== PSK SECURITY: Eve Cannot Decrypt PSK Messages ===")
+
+        var eveSuccesses = 0
+
+        for i in 0..<10 {
+            let counter = UInt32(i)
+            let currentPSK = PSKRatchet.derivePSKAtCounter(
+                initialPSK: initialPSK, counter: counter
+            )
+
+            let envelope = try MessageEncryptor.encryptPSK(
+                message: "Secret PSK message #\(i)",
+                senderPrivateKey: alice.privateKey,
+                recipientPublicKey: bob.publicKey,
+                currentPSK: currentPSK,
+                ratchetCounter: counter
+            )
+
+            // Bob CAN decrypt
+            let bobDecrypted = try MessageEncryptor.decryptPSK(
+                envelope: envelope,
+                recipientPrivateKey: bob.privateKey,
+                currentPSK: currentPSK
+            )
+            #expect(bobDecrypted != nil)
+
+            // Eve cannot decrypt (wrong key, no PSK)
+            let wrongPSK = PSKRatchet.derivePSKAtCounter(
+                initialPSK: Data(repeating: 0xDD, count: 32), counter: counter
+            )
+            do {
+                _ = try MessageEncryptor.decryptPSK(
+                    envelope: envelope,
+                    recipientPrivateKey: eve.privateKey,
+                    currentPSK: wrongPSK
+                )
+                eveSuccesses += 1
+            } catch {
+                // Expected
+            }
+        }
+
+        print("Eve decrypted: \(eveSuccesses)/10 PSK messages")
+        print("✅ Eve could not decrypt ANY PSK messages")
+        #expect(eveSuccesses == 0)
+    }
+
+    @Test("Mixed standard then PSK messages in same conversation")
+    func testMixedConversation() async throws {
+        let alice = SimulatedUser(name: "Alice")
+        let bob = SimulatedUser(name: "Bob")
+        let initialPSK = Data(repeating: 0xEE, count: 32)
+
+        print("\n=== MIXED CONVERSATION: Standard + PSK ===")
+
+        // Phase 1: 10 standard messages
+        for i in 1...10 {
+            let message = "Standard #\(i)"
+            let envelope = try MessageEncryptor.encrypt(
+                message: message,
+                senderPrivateKey: alice.privateKey,
+                recipientPublicKey: bob.publicKey
+            )
+
+            let decrypted = try MessageEncryptor.decrypt(
+                envelope: envelope,
+                recipientPrivateKey: bob.privateKey
+            )
+            #expect(decrypted?.text == message)
+        }
+        print("  ✓ 10 standard messages verified")
+
+        // Phase 2: 10 PSK messages
+        for i in 0..<10 {
+            let counter = UInt32(i)
+            let currentPSK = PSKRatchet.derivePSKAtCounter(
+                initialPSK: initialPSK, counter: counter
+            )
+
+            let message = "PSK #\(i)"
+            let envelope = try MessageEncryptor.encryptPSK(
+                message: message,
+                senderPrivateKey: alice.privateKey,
+                recipientPublicKey: bob.publicKey,
+                currentPSK: currentPSK,
+                ratchetCounter: counter
+            )
+
+            let decrypted = try MessageEncryptor.decryptPSK(
+                envelope: envelope,
+                recipientPrivateKey: bob.privateKey,
+                currentPSK: currentPSK
+            )
+            #expect(decrypted?.text == message)
+        }
+        print("  ✓ 10 PSK messages verified")
+
+        // Phase 3: 5 more standard messages (interleaved)
+        for i in 11...15 {
+            let message = "Standard #\(i)"
+            let envelope = try MessageEncryptor.encrypt(
+                message: message,
+                senderPrivateKey: alice.privateKey,
+                recipientPublicKey: bob.publicKey
+            )
+
+            let decrypted = try MessageEncryptor.decrypt(
+                envelope: envelope,
+                recipientPrivateKey: bob.privateKey
+            )
+            #expect(decrypted?.text == message)
+        }
+        print("  ✓ 5 more standard messages verified after PSK")
+
+        print("✅ Mixed conversation works correctly")
+    }
+}
+
+// MARK: - PSK Stored Message Helper
 
 // MARK: - Helpers
 

@@ -54,6 +54,17 @@ public enum ChatError: Error, Sendable {
 
     /// Insufficient balance
     case insufficientBalance(required: UInt64, available: UInt64)
+
+    // MARK: - PSK Errors
+
+    /// No PSK contact found for address
+    case pskNotFound(String)
+
+    /// PSK counter exceeds valid range
+    case pskCounterOutOfRange
+
+    /// PSK counter replay detected (duplicate counter value)
+    case pskCounterReplay
 }
 
 extension ChatError: LocalizedError {
@@ -89,6 +100,12 @@ extension ChatError: LocalizedError {
             "Transaction failed: \(reason)"
         case .insufficientBalance(let required, let available):
             "Insufficient balance: need \(required) microAlgos, have \(available)"
+        case .pskNotFound(let address):
+            "No PSK contact found for address: \(address)"
+        case .pskCounterOutOfRange:
+            "PSK ratchet counter exceeds valid range"
+        case .pskCounterReplay:
+            "PSK ratchet counter replay detected"
         }
     }
 }

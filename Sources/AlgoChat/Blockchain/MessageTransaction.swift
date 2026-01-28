@@ -57,4 +57,57 @@ public enum MessageTransaction {
         )
         return try SignedTransaction.sign(tx, with: sender.account)
     }
+
+    // MARK: - PSK Envelope Overloads
+
+    /**
+     Creates a payment transaction carrying a PSK-encrypted message
+
+     - Parameters:
+       - sender: The sending chat account
+       - recipient: The recipient's Algorand address
+       - envelope: The PSK encrypted message envelope
+       - params: Transaction parameters from the network
+       - amount: Optional payment amount (default: minimum)
+     - Returns: Unsigned PaymentTransaction
+     */
+    public static func create(
+        from sender: ChatAccount,
+        to recipient: Address,
+        envelope: PSKEnvelope,
+        params: TransactionParams,
+        amount: MicroAlgos = minimumPayment
+    ) throws -> PaymentTransaction {
+        let noteData = envelope.encode()
+
+        guard noteData.count <= 1024 else {
+            throw ChatError.messageTooLarge(maxSize: 1024)
+        }
+
+        return try PaymentTransactionBuilder()
+            .sender(sender.address)
+            .receiver(recipient)
+            .amount(amount)
+            .note(noteData)
+            .params(params)
+            .build()
+    }
+
+    /// Creates and signs a PSK message transaction
+    public static func createSigned(
+        from sender: ChatAccount,
+        to recipient: Address,
+        envelope: PSKEnvelope,
+        params: TransactionParams,
+        amount: MicroAlgos = minimumPayment
+    ) throws -> SignedTransaction {
+        let tx = try create(
+            from: sender,
+            to: recipient,
+            envelope: envelope,
+            params: params,
+            amount: amount
+        )
+        return try SignedTransaction.sign(tx, with: sender.account)
+    }
 }
