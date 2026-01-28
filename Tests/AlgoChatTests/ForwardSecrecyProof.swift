@@ -190,7 +190,7 @@ struct ForwardSecrecyProof {
 
     // MARK: - PROOF 5: Forward Secrecy Property
 
-    @Test("PROOF 5: Compromising long-term key doesn't reveal past messages")
+    @Test("PROOF 5: Third party cannot decrypt messages")
     func proof5_forwardSecrecyProperty() throws {
         print("\n" + String(repeating: "=", count: 70))
         print("PROOF 5: FORWARD SECRECY PROPERTY")
@@ -198,6 +198,7 @@ struct ForwardSecrecyProof {
 
         let sender = Curve25519.KeyAgreement.PrivateKey()
         let recipient = Curve25519.KeyAgreement.PrivateKey()
+        let eve = Curve25519.KeyAgreement.PrivateKey()
 
         // Send a message (ephemeral key is generated and discarded)
         let envelope = try MessageEncryptor.encrypt(
@@ -209,58 +210,42 @@ struct ForwardSecrecyProof {
         print("Message encrypted with ephemeral key")
         print("Ephemeral public key in envelope: \(envelope.ephemeralPublicKey.prefix(8).hexString)...")
 
-        // Simulate attacker who has:
-        // 1. The sender's LONG-TERM private key (compromised!)
-        // 2. The encrypted envelope from the network
-        // But NOT the ephemeral private key (never stored)
-
+        // Eve is a third party who is neither sender nor recipient
         print("\n--- ATTACKER SCENARIO ---")
-        print("Attacker has: Sender's long-term private key ✓")
-        print("Attacker has: Encrypted envelope from network ✓")
-        print("Attacker has: Ephemeral private key? ✗ (never stored)")
+        print("Eve has: Her own private key ✓")
+        print("Eve has: Encrypted envelope from network ✓")
+        print("Eve has: Sender or recipient private key? ✗")
 
-        // Attacker tries to decrypt using sender's long-term key
-        // This will fail because decryption uses recipient's key + ephemeral public
-        var attackSucceeded = false
+        var eveSucceeded = false
         do {
-            // The attacker would need recipient's private key to decrypt
-            // Even with sender's private key, they cannot recover the message
-            // Because the symmetric key is derived from:
-            // ECDH(ephemeral_private, recipient_public) - sender side
-            // ECDH(recipient_private, ephemeral_public) - recipient side
-
-            // Attacker only has sender_static_private, not ephemeral_private
-            // So they cannot compute the shared secret
-
-            print("\nAttacker cannot derive symmetric key because:")
-            print("  - Key = HKDF(ECDH(ephemeral_private, recipient_public))")
-            print("  - Ephemeral private key was never saved")
-            print("  - Even compromising sender's static key doesn't help")
-
-            // Actually attempt decryption with the wrong key
-            print("\nAttempting decryption with sender's key (should fail)...")
             _ = try MessageEncryptor.decrypt(
                 envelope: envelope,
-                recipientPrivateKey: sender  // Attacker uses sender's key
+                recipientPrivateKey: eve
             )
-            attackSucceeded = true  // Should never reach here
+            eveSucceeded = true
         } catch {
-            attackSucceeded = false
-            print("Attacker decryption: ❌ FAILED (as expected)")
-            print("Error: \(error)")
+            print("Eve decryption: ❌ FAILED (as expected)")
         }
 
-        // Legitimate recipient CAN still decrypt
-        let decrypted = try MessageEncryptor.decrypt(
+        // Sender CAN decrypt (bidirectional via encrypted sender key)
+        let senderDecrypted = try MessageEncryptor.decrypt(
+            envelope: envelope,
+            recipientPrivateKey: sender
+        )
+        print("Sender decryption: ✅ (bidirectional)")
+
+        // Recipient CAN decrypt
+        let recipientDecrypted = try MessageEncryptor.decrypt(
             envelope: envelope,
             recipientPrivateKey: recipient
         )
+        print("Recipient decryption: ✅")
 
-        print("\nLegitimate recipient decryption: ✅ \"\(decrypted!.text)\"")
-        print("\n✅ PROOF: Forward secrecy - past messages safe even if keys compromised")
+        print("\n✅ PROOF: Only sender and recipient can decrypt")
 
-        #expect(!attackSucceeded)
-        #expect(decrypted?.text == "This message has forward secrecy")
+        #expect(!eveSucceeded, "Third party must not decrypt")
+        #expect(senderDecrypted?.text == "This message has forward secrecy")
+        #expect(recipientDecrypted?.text == "This message has forward secrecy")
     }
 
     // MARK: - PROOF 6: Nonce Security
@@ -315,26 +300,28 @@ struct ForwardSecrecyProof {
 
         let encoded = envelope.encode()
 
-        print("V2 Envelope Structure:")
-        print("  [0]      Version:           0x\(String(format: "%02x", encoded[0])) (V2)")
-        print("  [1]      Protocol:          0x\(String(format: "%02x", encoded[1])) (AlgoChat)")
-        print("  [2-33]   Sender static key: \(Data(encoded[2..<34]).prefix(8).hexString)... (32 bytes)")
-        print("  [34-65]  Ephemeral key:     \(Data(encoded[34..<66]).prefix(8).hexString)... (32 bytes)")
-        print("  [66-77]  Nonce:             \(Data(encoded[66..<78]).hexString) (12 bytes)")
-        print("  [78...]  Ciphertext+Tag:    \(Data(encoded[78...]).prefix(8).hexString)... (\(encoded.count - 78) bytes)")
+        print("Envelope Structure:")
+        print("  [0]       Version:            0x\(String(format: "%02x", encoded[0])) (V1)")
+        print("  [1]       Protocol:           0x\(String(format: "%02x", encoded[1])) (AlgoChat Standard)")
+        print("  [2-33]    Sender static key:  \(Data(encoded[2..<34]).prefix(8).hexString)... (32 bytes)")
+        print("  [34-65]   Ephemeral key:      \(Data(encoded[34..<66]).prefix(8).hexString)... (32 bytes)")
+        print("  [66-77]   Nonce:              \(Data(encoded[66..<78]).hexString) (12 bytes)")
+        print("  [78-125]  Encrypted sender key: \(Data(encoded[78..<126]).prefix(8).hexString)... (48 bytes)")
+        print("  [126...]  Ciphertext+Tag:     \(Data(encoded[126...]).prefix(8).hexString)... (\(encoded.count - 126) bytes)")
         print("\nTotal envelope size: \(encoded.count) bytes")
-        print("Header overhead: 78 bytes")
-        print("Max payload (1024 - 78 - 16): 930 bytes")
+        print("Header overhead: \(ChatEnvelope.headerSize) bytes")
+        print("Max payload (1024 - \(ChatEnvelope.headerSize) - 16): \(ChatEnvelope.maxPayloadSize) bytes")
 
         // Verify structure
-        #expect(encoded[0] == 0x02, "Version must be 0x02")
+        #expect(encoded[0] == 0x01, "Version must be 0x01")
         #expect(encoded[1] == 0x01, "Protocol must be 0x01")
-        #expect(encoded.count >= 78 + 16, "Must have header + auth tag")
+        #expect(encoded.count >= ChatEnvelope.headerSize + ChatEnvelope.tagSize, "Must have header + auth tag")
 
         // Decode and verify round-trip
         let decoded = try ChatEnvelope.decode(from: encoded)
         #expect(decoded.senderPublicKey == envelope.senderPublicKey)
         #expect(decoded.ephemeralPublicKey == envelope.ephemeralPublicKey)
+        #expect(decoded.encryptedSenderKey == envelope.encryptedSenderKey)
         #expect(decoded.nonce == envelope.nonce)
         #expect(decoded.ciphertext == envelope.ciphertext)
 

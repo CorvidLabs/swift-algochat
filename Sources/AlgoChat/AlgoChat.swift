@@ -57,6 +57,9 @@ public actor AlgoChat {
     /// Public key cache for reducing blockchain lookups
     private let publicKeyCache: PublicKeyCache
 
+    /// Optional PSK manager for pre-shared key messaging
+    public let pskManager: PSKManager?
+
     // MARK: - Initialization
 
     /**
@@ -67,17 +70,25 @@ public actor AlgoChat {
        - account: The Algorand account to use for chat
        - messageCache: Optional message cache for offline access
        - publicKeyCache: Optional public key cache (default: in-memory with 24h TTL)
+       - pskStorage: Optional PSK storage for pre-shared key messaging
      */
     public init(
         network: AlgorandConfiguration.Network,
         account: Account,
         messageCache: (any MessageCache)? = nil,
-        publicKeyCache: PublicKeyCache? = nil
+        publicKeyCache: PublicKeyCache? = nil,
+        pskStorage: (any PSKStorage)? = nil
     ) async throws {
         self.algokit = AlgoKit(network: network)
         self.account = try ChatAccount(account: account)
         self.messageCache = messageCache
         self.publicKeyCache = publicKeyCache ?? PublicKeyCache()
+
+        if let pskStorage {
+            self.pskManager = PSKManager(storage: pskStorage)
+        } else {
+            self.pskManager = nil
+        }
 
         guard let indexerClient = await algokit.indexerClient else {
             throw ChatError.indexerNotConfigured
@@ -85,7 +96,8 @@ public actor AlgoChat {
 
         self.indexer = MessageIndexer(
             indexerClient: indexerClient,
-            chatAccount: self.account
+            chatAccount: self.account,
+            pskManager: self.pskManager
         )
     }
 
@@ -97,17 +109,25 @@ public actor AlgoChat {
        - account: The Algorand account to use for chat
        - messageCache: Optional message cache for offline access
        - publicKeyCache: Optional public key cache (default: in-memory with 24h TTL)
+       - pskStorage: Optional PSK storage for pre-shared key messaging
      */
     public init(
         configuration: AlgorandConfiguration,
         account: Account,
         messageCache: (any MessageCache)? = nil,
-        publicKeyCache: PublicKeyCache? = nil
+        publicKeyCache: PublicKeyCache? = nil,
+        pskStorage: (any PSKStorage)? = nil
     ) async throws {
         self.algokit = AlgoKit(configuration: configuration)
         self.account = try ChatAccount(account: account)
         self.messageCache = messageCache
         self.publicKeyCache = publicKeyCache ?? PublicKeyCache()
+
+        if let pskStorage {
+            self.pskManager = PSKManager(storage: pskStorage)
+        } else {
+            self.pskManager = nil
+        }
 
         guard let indexerClient = await algokit.indexerClient else {
             throw ChatError.indexerNotConfigured
@@ -115,7 +135,8 @@ public actor AlgoChat {
 
         self.indexer = MessageIndexer(
             indexerClient: indexerClient,
-            chatAccount: self.account
+            chatAccount: self.account,
+            pskManager: self.pskManager
         )
     }
 
@@ -386,9 +407,11 @@ public actor AlgoChat {
         return SendResult(txid: txid, message: sentMessage)
     }
 
-    /// Sends a message to an address (convenience for one-off messages)
-    ///
-    /// For persistent messaging, use `conversation(with:)` and `send(_:to:options:)`.
+    /**
+     Sends a message to an address (convenience for one-off messages)
+
+     For persistent messaging, use `conversation(with:)` and `send(_:to:options:)`.
+     */
     @discardableResult
     public func send(
         _ message: String,
@@ -549,5 +572,213 @@ public actor AlgoChat {
      */
     public func invalidateCachedPublicKey(for address: Address) async {
         await publicKeyCache.invalidate(for: address)
+    }
+
+    // MARK: - PSK Contact Management
+
+    /**
+     Adds a PSK contact for pre-shared key messaging
+
+     - Parameters:
+       - address: The contact's Algorand address
+       - psk: The 32-byte pre-shared key
+       - label: Optional human-readable label
+     */
+    public func addPSKContact(address: String, psk: Data, label: String? = nil) async throws {
+        guard let pskManager else {
+            throw ChatError.pskNotFound("PSK manager not configured")
+        }
+
+        let contact = PSKContact(address: address, initialPSK: psk, label: label)
+        try await pskManager.addContact(contact)
+    }
+
+    /**
+     Adds a PSK contact from a PSK exchange URI
+
+     - Parameter uri: The parsed PSK exchange URI
+     */
+    public func addPSKContact(uri: PSKExchangeURI) async throws {
+        try await addPSKContact(address: uri.address, psk: uri.psk, label: uri.label)
+    }
+
+    /**
+     Removes a PSK contact
+
+     - Parameter address: The Algorand address to remove
+     */
+    public func removePSKContact(for address: String) async throws {
+        guard let pskManager else {
+            throw ChatError.pskNotFound("PSK manager not configured")
+        }
+        try await pskManager.removeContact(for: address)
+    }
+
+    /**
+     Checks if a PSK contact exists
+
+     - Parameter address: The Algorand address to check
+     - Returns: true if a PSK contact exists
+     */
+    public func hasPSKContact(for address: String) async -> Bool {
+        guard let pskManager else { return false }
+        return await pskManager.hasContact(for: address)
+    }
+
+    /**
+     Lists all PSK contacts
+
+     - Returns: Array of PSK contacts
+     */
+    public func pskContacts() async throws -> [PSKContact] {
+        guard let pskManager else { return [] }
+        return try await pskManager.listContacts()
+    }
+
+    /**
+     Generates a PSK exchange URI for sharing with another user
+
+     - Parameters:
+       - psk: The 32-byte pre-shared key to share
+       - label: Optional label for the contact
+     - Returns: A PSK exchange URI
+     */
+    public func generatePSKExchangeURI(psk: Data, label: String? = nil) -> PSKExchangeURI {
+        PSKExchangeURI(address: account.address.description, psk: psk, label: label)
+    }
+
+    // MARK: - PSK Sending
+
+    /**
+     Sends a message using PSK mode
+
+     Both sender and recipient must have exchanged pre-shared keys. Messages
+     use hybrid PSK + ephemeral ECDH for enhanced security.
+
+     - Parameters:
+       - message: The plaintext message (max ~878 bytes when UTF-8 encoded)
+       - conversation: The conversation to send to
+       - options: Send options (default: fire-and-forget)
+     - Returns: SendResult containing the transaction ID and sent message
+     */
+    @discardableResult
+    public func sendPSK(
+        _ message: String,
+        to conversation: Conversation,
+        options: SendOptions = .default
+    ) async throws -> SendResult {
+        guard let pskManager else {
+            throw ChatError.pskNotFound("PSK manager not configured")
+        }
+
+        // Validate message size
+        let messageBytes = Data(message.utf8)
+        let maxSize = PSKEnvelope.maxPayloadSize
+        if messageBytes.count > maxSize {
+            throw ChatError.messageTooLarge(maxSize: maxSize)
+        }
+
+        // Check balance
+        let currentBalance = try await balance()
+        let requiredBalance = Self.minTransactionFee + Self.minAccountBalance
+        if currentBalance.value < requiredBalance {
+            throw ChatError.insufficientBalance(
+                required: requiredBalance,
+                available: currentBalance.value
+            )
+        }
+
+        // Get recipient's encryption public key
+        let pubKey: Curve25519.KeyAgreement.PublicKey
+        if let cached = conversation.participantEncryptionKey {
+            pubKey = cached
+        } else if conversation.participant == account.address {
+            pubKey = account.encryptionPublicKey
+        } else {
+            pubKey = try await fetchPublicKey(for: conversation.participant)
+        }
+
+        // Get PSK counter and derived key
+        let peerAddress = conversation.participant.description
+        let (counter, currentPSK) = try await pskManager.nextSendCounter(for: peerAddress)
+
+        // Encrypt using PSK mode
+        let envelope: PSKEnvelope
+        if let replyContext = options.replyContext {
+            envelope = try MessageEncryptor.encryptPSK(
+                message: message,
+                replyTo: (txid: replyContext.messageId, preview: replyContext.preview),
+                senderPrivateKey: account.encryptionPrivateKey,
+                recipientPublicKey: pubKey,
+                currentPSK: currentPSK,
+                ratchetCounter: counter
+            )
+        } else {
+            envelope = try MessageEncryptor.encryptPSK(
+                message: message,
+                senderPrivateKey: account.encryptionPrivateKey,
+                recipientPublicKey: pubKey,
+                currentPSK: currentPSK,
+                ratchetCounter: counter
+            )
+        }
+
+        // Get transaction parameters
+        let params = try await algokit.algodClient.transactionParams()
+
+        // Create and sign the transaction
+        let signedTx = try MessageTransaction.createSigned(
+            from: account,
+            to: conversation.participant,
+            envelope: envelope,
+            params: params,
+            amount: options.amount ?? MessageTransaction.minimumPayment
+        )
+
+        // Submit transaction
+        let txid = try await algokit.algodClient.sendTransaction(signedTx)
+
+        // Wait for confirmation if requested
+        var confirmedRound: UInt64 = 0
+        let timestamp = Date()
+
+        if options.waitForConfirmation {
+            let confirmation = try await algokit.algodClient.waitForConfirmation(
+                transactionID: txid,
+                timeout: options.timeout
+            )
+            confirmedRound = confirmation.confirmedRound ?? 0
+        }
+
+        // Wait for indexer if requested
+        if options.waitForIndexer {
+            _ = await indexer.waitForTransaction(txid, timeout: options.indexerTimeout)
+        }
+
+        // Build the sent message
+        let sentMessage = Message(
+            id: txid,
+            sender: account.address,
+            recipient: conversation.participant,
+            content: message,
+            timestamp: timestamp,
+            confirmedRound: confirmedRound,
+            direction: .sent,
+            replyContext: options.replyContext,
+            protocolMode: .psk
+        )
+
+        return SendResult(txid: txid, message: sentMessage)
+    }
+
+    /// Sends a PSK message to an address (convenience for one-off messages)
+    @discardableResult
+    public func sendPSK(
+        _ message: String,
+        to recipient: Address,
+        options: SendOptions = .default
+    ) async throws -> SendResult {
+        let conv = try await conversation(with: recipient)
+        return try await sendPSK(message, to: conv, options: options)
     }
 }
