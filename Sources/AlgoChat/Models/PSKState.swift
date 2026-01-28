@@ -63,7 +63,8 @@ public struct PSKState: Sendable, Codable {
         } else {
             lowerBound = 0
         }
-        let upperBound = peerLastCounter + Self.counterWindow
+        let upperResult = peerLastCounter.addingReportingOverflow(Self.counterWindow)
+        let upperBound: UInt32 = upperResult.overflow ? .max : upperResult.partialValue
 
         guard counter >= lowerBound && counter <= upperBound else {
             throw ChatError.pskCounterOutOfRange

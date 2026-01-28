@@ -98,17 +98,19 @@ public actor PSKManager {
      */
     public func nextSendCounter(for address: String) async throws -> (counter: UInt32, currentPSK: Data) {
         let contact = try await getContact(for: address)
-        var state = try await getState(for: address)
+        let state = try await getState(for: address)
 
-        let counter = state.advanceSendCounter()
+        // Work on a copy so cache is only updated after successful persistence
+        var newState = state
+        let counter = newState.advanceSendCounter()
         let currentPSK = PSKRatchet.derivePSKAtCounter(
             initialPSK: contact.initialPSK,
             counter: counter
         )
 
-        // Persist the updated state
-        try await storage.storeState(state, for: address)
-        stateCache[address] = state
+        // Persist before updating cache to avoid desync on failure
+        try await storage.storeState(newState, for: address)
+        stateCache[address] = newState
 
         return (counter: counter, currentPSK: currentPSK)
     }
