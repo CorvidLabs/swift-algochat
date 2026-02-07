@@ -2,6 +2,10 @@ import Algorand
 @preconcurrency import Crypto
 import Foundation
 
+#if canImport(Security)
+import Security
+#endif
+
 /**
  File-based encryption key storage with password protection
 
@@ -253,9 +257,23 @@ public actor FileKeyStorage: EncryptionKeyStorage {
     /// Generates cryptographically secure random bytes
     private func generateRandomBytes(count: Int) -> Data {
         var bytes = [UInt8](repeating: 0, count: count)
-        for i in 0..<count {
-            bytes[i] = UInt8.random(in: 0...255)
+        #if canImport(Security)
+        let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        guard status == errSecSuccess else {
+            fatalError("Failed to generate secure random bytes")
         }
+        #else
+        // Linux: use /dev/urandom which is cryptographically secure
+        guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
+            fatalError("Failed to open /dev/urandom")
+        }
+        let randomData = urandom.readData(ofLength: count)
+        urandom.closeFile()
+        guard randomData.count == count else {
+            fatalError("Failed to read enough random bytes from /dev/urandom")
+        }
+        bytes = [UInt8](randomData)
+        #endif
         return Data(bytes)
     }
 
@@ -297,7 +315,7 @@ private enum PBKDF2<Hash: HashFunction> {
 
         // Hash the password with salt multiple times to simulate PBKDF2
         var derived = password + salt
-        for _ in 0..<(iterations / 1000) {
+        for _ in 0..<iterations {
             derived = Data(Hash.hash(data: derived))
         }
 
