@@ -15,11 +15,14 @@ Encrypted peer-to-peer messaging on the Algorand blockchain. Built with Swift 6 
 
 - **End-to-End Encryption** - X25519 key agreement + ChaCha20-Poly1305
 - **Forward Secrecy** - Per-message ephemeral keys protect past messages
+- **Quantum Defense-in-Depth** - Optional ratcheting PSK mode (protocol v1.1) provides hybrid X25519 + pre-shared key encryption
+- **Replay Protection** - Counter-based sliding window for PSK messages
 - **Immutable Messages** - Permanently recorded on-chain
 - **Decentralized** - No central server controls delivery
 - **Bidirectional Decryption** - Both sender and recipient can decrypt messages
 - **Reply Support** - Thread conversations with reply context
 - **Biometric Storage** - Protect encryption keys with Face ID / Touch ID
+- **Cross-Implementation** - Compatible with [ts-algochat](https://github.com/CorvidLabs/ts-algochat), [rs-algochat](https://github.com/CorvidLabs/rs-algochat), [py-algochat](https://github.com/CorvidLabs/py-algochat), [kt-algochat](https://github.com/CorvidLabs/kt-algochat)
 - **Multi-Platform** - iOS 15+, macOS 12+, tvOS 15+, watchOS 8+, visionOS 1+, Linux
 
 ## Installation
@@ -110,6 +113,33 @@ Allow others to message you before you've sent them a message:
 try await chat.publishKeyAndWait()
 ```
 
+### PSK Mode (Quantum Defense-in-Depth)
+
+PSK mode adds a pre-shared key layer on top of standard ECDH encryption, providing defense-in-depth against future quantum attacks on key exchange.
+
+```swift
+// Generate and share a PSK exchange URI
+let psk = PSKExchangeURI(
+    address: account.address.description,
+    psk: Data.random(count: 32),
+    label: "Alice"
+)
+let uri = psk.toString()
+// Share uri out-of-band: algochat-psk://v1?addr=...&psk=...&label=Alice
+
+// Import a PSK from a received URI
+let received = try PSKExchangeURI.parse(uri)
+let contact = PSKContact(
+    address: received.address,
+    initialPSK: received.psk,
+    label: received.label
+)
+
+// Manage PSK contacts
+let pskManager = PSKManager(storage: FilePSKStorage(directory: ".algochat"))
+try await pskManager.addContact(contact)
+```
+
 ## Core Concepts
 
 ### Encryption
@@ -121,7 +151,9 @@ Messages are encrypted using modern cryptographic primitives:
 - **Key Derivation**: HKDF-SHA256 with domain separation
 - **Forward Secrecy**: Fresh ephemeral key per message
 
-### Message Envelope Format (v1)
+### Message Envelope Formats
+
+**Standard Mode** (protocol `0x01`):
 
 ```
 [version: 1][protocol: 1][sender_pubkey: 32][ephemeral_pubkey: 32][nonce: 12][encrypted_sender_key: 48][ciphertext: variable]
@@ -129,6 +161,15 @@ Messages are encrypted using modern cryptographic primitives:
 
 - **Header size**: 126 bytes
 - **Maximum message**: 882 bytes (after encryption overhead)
+
+**PSK Ratcheting Mode** (protocol `0x02`):
+
+```
+[version: 1][protocol: 2][ratchet_counter: 4][sender_pubkey: 32][ephemeral_pubkey: 32][nonce: 12][encrypted_sender_key: 48][ciphertext: variable]
+```
+
+- **Header size**: 130 bytes
+- **Maximum message**: 878 bytes (after encryption overhead)
 
 ### Key Storage
 
