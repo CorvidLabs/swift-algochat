@@ -5,7 +5,9 @@ import Testing
 @testable import AlgoChat
 
 /// Tests for FileKeyStorage - password-protected file-based key storage
-@Suite("FileKeyStorage Tests")
+/// Serialized because PBKDF2 with 100K iterations is CPU-intensive and
+/// concurrent execution can crash BoringSSL on Linux CI.
+@Suite("FileKeyStorage Tests", .serialized)
 struct FileKeyStorageTests {
     // MARK: - Test Helpers
 
