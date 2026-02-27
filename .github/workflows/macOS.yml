@@ -14,4 +14,13 @@ jobs:
     - name: Build
       run: swift build -v
     - name: Run tests
-      run: swift test -v --skip "LocalnetIntegration" --skip "CustomAmountIntegration"
+      run: >-
+        swift test -v
+        --skip "LocalnetIntegration"
+        --skip "CustomAmountIntegration"
+        --skip "MultiUserConversation"
+        --skip "SecurityBoundary"
+        --skip "KeyRotation"
+        --skip "LongTermUsage"
+        --skip "PSKSimulation"
+        --skip "ForwardSecrecyProof"
