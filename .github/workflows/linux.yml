@@ -19,7 +19,6 @@ jobs:
       - name: Run tests
         run: >-
           swift test -v
-          --parallel --num-workers 1
           --filter "ChatEnvelope|ChatError|MessageEncryptor|MessageCodable|MessageDirection|MessageEquality|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage|FileSendQueue|EnvelopeDecoder|ErrorRecovery|ConversationMerge|CrossProtocol|CustomAmountTests|EdgeCase|EphemeralKeyManager|EncryptionTests|InMemory|PendingMessage|SendQueue|PSKEncryption|PSKEnvelope|PSKExchangeURI|PSKRatchet|PSKState|PublicKeyCache|ReplyContext|SyncManager|MessageIndexer|CacheTests"
 
   cli:
