@@ -7,7 +7,7 @@ import Testing
 import Security
 #endif
 
-@Suite("EphemeralKeyManager Tests")
+@Suite("EphemeralKeyManager Tests", .serialized)
 struct EphemeralKeyManagerTests {
     private let keyManager = EphemeralKeyManager()
 
@@ -80,7 +80,7 @@ struct EphemeralKeyManagerTests {
     }
 }
 
-@Suite("ChatEnvelope Tests")
+@Suite("ChatEnvelope Tests", .serialized)
 struct ChatEnvelopeForwardSecrecyTests {
     @Test("Envelope has correct version")
     func testVersion() {
@@ -184,7 +184,7 @@ struct ChatEnvelopeForwardSecrecyTests {
     }
 }
 
-@Suite("Encryption Tests")
+@Suite("Encryption Tests", .serialized)
 struct EncryptionTests {
     @Test("Encrypt produces envelope with forward secrecy")
     func testEncryptProducesEnvelope() throws {
@@ -417,7 +417,7 @@ struct EncryptionTests {
     }
 }
 
-@Suite("Edge Case Tests")
+@Suite("Edge Case Tests", .serialized)
 struct EdgeCaseTests {
     @Test("Tampered ephemeral public key fails decryption")
     func testTamperedEphemeralKey() throws {

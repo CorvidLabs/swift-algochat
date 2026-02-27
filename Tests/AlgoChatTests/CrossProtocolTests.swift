@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("Cross-Protocol Tests (Standard + PSK Coexistence)")
+@Suite("Cross-Protocol Tests (Standard + PSK Coexistence)", .serialized)
 struct CrossProtocolTests {
 
     // MARK: - Standard Mode Unaffected
