@@ -16,23 +16,29 @@ jobs:
       - name: Build
         run: swift build -v
 
-      # Split tests into batches to avoid concurrent BoringSSL crashes.
-      # Swift Testing runs all matched tests concurrently within a process,
-      # so we limit each batch to ~10 filter patterns.
-      - name: Run tests (batch 1 - core + messaging)
+      # Run tests in small batches: Swift Testing executes all matched
+      # tests concurrently, which can crash BoringSSL when too many
+      # crypto operations run simultaneously.
+      - name: Run tests (core crypto)
         run: >-
           swift test -v
-          --filter "ChatEnvelope|ChatError|MessageEncryptor|MessageCodable|MessageDirection|MessageEquality|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
-
-      - name: Run tests (batch 2 - protocols + crypto)
+          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
+      - name: Run tests (forward secrecy)
         run: >-
           swift test -v
-          --filter "EnvelopeDecoder|ErrorRecovery|CrossProtocol|EdgeCase|EphemeralKeyManager|EncryptionTests|PSKEncryption|PSKEnvelope|PSKRatchet|PSKState"
-
-      - name: Run tests (batch 3 - queues + sync + misc)
+          --filter "EdgeCase|EphemeralKeyManager|EncryptionTests"
+      - name: Run tests (PSK crypto)
         run: >-
           swift test -v
-          --filter "FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PublicKeyCache|ReplyContext|SyncManager|MessageIndexer|CacheTests"
+          --filter "PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol"
+      - name: Run tests (error handling + decoder)
+        run: >-
+          swift test -v
+          --filter "EnvelopeDecoder|ErrorRecovery|ChatError"
+      - name: Run tests (messaging + queues + misc)
+        run: >-
+          swift test -v
+          --filter "MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
 
   cli:
     runs-on: ubuntu-latest
