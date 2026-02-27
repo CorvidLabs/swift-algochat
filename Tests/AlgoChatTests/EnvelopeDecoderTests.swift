@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("Envelope Decoder Tests")
+@Suite("Envelope Decoder Tests", .serialized)
 struct EnvelopeDecoderTests {
 
     // MARK: - Standard Envelope

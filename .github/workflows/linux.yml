@@ -19,12 +19,10 @@ jobs:
       # Run tests in small batches: Swift Testing executes all matched
       # tests concurrently, which can crash BoringSSL when too many
       # crypto operations run simultaneously.
-      - name: Run tests (ChatError)
-        run: swift test -v --filter "ChatError"
-      - name: Run tests (ErrorRecovery)
-        run: swift test -v --filter "ErrorRecovery"
-      - name: Run tests (EnvelopeDecoder)
-        run: swift test -v --filter "EnvelopeDecoder"
+      - name: Run tests (error handling + decoder)
+        run: >-
+          swift test -v
+          --filter "EnvelopeDecoder|ErrorRecovery|ChatError"
       - name: Run tests (core crypto)
         run: >-
           swift test -v
