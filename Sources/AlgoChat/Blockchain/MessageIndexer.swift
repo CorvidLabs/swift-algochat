@@ -187,7 +187,7 @@ public actor MessageIndexer {
             }
 
             let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
-            return DiscoveredKey(publicKey: publicKey, isVerified: true)
+            return DiscoveredKey(publicKey: publicKey, isVerified: false)
         }
 
         throw ChatError.publicKeyNotFound(address.description)
