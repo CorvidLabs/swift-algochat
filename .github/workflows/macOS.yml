@@ -13,17 +13,21 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: swift build -v
-    # Run tests in batches to limit concurrent crypto operations.
-    # Swift Testing runs matched suites in parallel; too many simultaneous
-    # CryptoKit operations crash the test runner (signal 5).
-    - name: Run tests (core crypto)
+    # Run tests in small batches — max 3 crypto-heavy suites per batch.
+    # Swift Testing runs all matched suites concurrently; BoringSSL/CryptoKit
+    # crashes (signal 5) when too many Curve25519 operations run in parallel.
+    - name: Run tests (encryptor + signatures)
       run: >-
         swift test -v
-        --filter "ChatEnvelopeTests|ChatEnvelopeForwardSecrecyTests|MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests"
-    - name: Run tests (key storage + forward secrecy)
+        --filter "MessageEncryptorTests|SignatureVerifierTests|KeyDerivationTests"
+    - name: Run tests (forward secrecy)
       run: >-
         swift test -v
-        --filter "KeyStorageTests|FileKeyStorageTests|EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests|ForwardSecrecyProof"
+        --filter "EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests"
+    - name: Run tests (key storage + proof)
+      run: >-
+        swift test -v
+        --filter "KeyStorageTests|FileKeyStorageTests|ForwardSecrecyProof"
     - name: Run tests (PSK crypto)
       run: >-
         swift test -v
@@ -31,8 +35,8 @@ jobs:
     - name: Run tests (error handling + decoders)
       run: >-
         swift test -v
-        --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatErrorTests|PSKEnvelopeTests|ChatEnvelopeValidationTests"
-    - name: Run tests (messaging + misc)
+        --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatEnvelopeValidationTests"
+    - name: Run tests (unit + misc)
       run: >-
         swift test -v
-        --filter "MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
+        --filter "ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|ChatErrorTests|PSKEnvelopeTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
