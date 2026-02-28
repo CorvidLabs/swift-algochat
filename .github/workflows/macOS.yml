@@ -15,20 +15,24 @@ jobs:
       run: swift build -v
     # Run tests in batches to limit concurrent crypto operations.
     # Swift Testing runs matched suites in parallel; too many simultaneous
-    # BoringSSL/CryptoKit operations crash the test runner.
+    # CryptoKit operations crash the test runner (signal 5).
     - name: Run tests (core crypto)
       run: >-
         swift test -v
-        --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier"
+        --filter "ChatEnvelopeTests|ChatEnvelopeForwardSecrecyTests|MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests"
     - name: Run tests (key storage + forward secrecy)
       run: >-
         swift test -v
-        --filter "KeyStorage|FileKeyStorage|EphemeralKeyManager|EncryptionTests|EdgeCase"
-    - name: Run tests (PSK + decoders + errors)
+        --filter "KeyStorageTests|FileKeyStorageTests|EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests|ForwardSecrecyProof"
+    - name: Run tests (PSK crypto)
       run: >-
         swift test -v
-        --filter "PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol|EnvelopeDecoder|ErrorRecovery|ChatError"
+        --filter "PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
+    - name: Run tests (error handling + decoders)
+      run: >-
+        swift test -v
+        --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatErrorTests|PSKEnvelopeTests|ChatEnvelopeValidationTests"
     - name: Run tests (messaging + misc)
       run: >-
         swift test -v
-        --filter "MessageCodable|MessageDirection|MessageEquality|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
+        --filter "MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
