@@ -16,17 +16,25 @@ jobs:
       - name: Build
         run: swift build -v
 
-      # Run tests in two batches to limit concurrent crypto operations.
-      # Swift Testing runs matched suites concurrently; too many simultaneous
-      # BoringSSL/CryptoKit operations can crash the test runner.
-      - name: Run tests (crypto)
+      # Run tests in batches to limit concurrent crypto operations.
+      # Swift Testing runs matched suites in parallel; too many simultaneous
+      # BoringSSL operations crash the test runner.
+      - name: Run tests (core crypto)
         run: >-
           swift test -v
           --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
-      - name: Run tests (unit)
+      - name: Run tests (forward secrecy + PSK)
         run: >-
           swift test -v
-          --filter "EnvelopeDecoder|ErrorRecovery|ChatError|EphemeralKeyManager|EncryptionTests|EdgeCase|PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol|MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
+          --filter "EphemeralKeyManager|EncryptionTests|EdgeCase|PSKEncryption|PSKRatchet|CrossProtocol"
+      - name: Run tests (decoders + error handling)
+        run: >-
+          swift test -v
+          --filter "EnvelopeDecoder|ErrorRecovery|ChatError|PSKEnvelope"
+      - name: Run tests (messaging + misc)
+        run: >-
+          swift test -v
+          --filter "MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
 
   cli:
     runs-on: ubuntu-latest
