@@ -27,10 +27,14 @@ jobs:
         run: >-
           swift test -v
           --filter "EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests"
-      - name: Run tests (key storage + proof)
+      - name: Run tests (key storage)
         run: >-
           swift test -v
-          --filter "KeyStorageTests|FileKeyStorageTests|ForwardSecrecyProof"
+          --filter "KeyStorageTests|FileKeyStorageTests"
+      - name: Run tests (forward secrecy proof)
+        run: >-
+          swift test -v
+          --filter "ForwardSecrecyProof"
       - name: Run tests (PSK crypto)
         run: >-
           swift test -v
