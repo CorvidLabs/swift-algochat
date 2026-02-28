@@ -13,34 +13,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build tests
-        run: swift build --build-tests -v
+      - name: Build
+        run: swift build -v
 
-      # Run tests in small batches: Swift Testing executes all matched
-      # tests concurrently, which can crash BoringSSL when too many
-      # crypto operations run simultaneously.
-      - name: Run tests (ChatError)
-        run: swift test --skip-build -v --disable-xctest --filter "ChatError"
-      - name: Run tests (ErrorRecovery)
-        run: swift test --skip-build -v --disable-xctest --filter "ErrorRecovery"
-      - name: Run tests (EnvelopeDecoder)
-        run: swift test --skip-build -v --disable-xctest --filter "EnvelopeDecoder"
-      - name: Run tests (core crypto)
+      # Run tests in two batches to limit concurrent crypto operations.
+      # Swift Testing runs matched suites concurrently; too many simultaneous
+      # BoringSSL/CryptoKit operations can crash the test runner.
+      - name: Run tests (crypto)
         run: >-
-          swift test --skip-build -v --disable-xctest
+          swift test -v
           --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
-      - name: Run tests (forward secrecy)
+      - name: Run tests (unit)
         run: >-
-          swift test --skip-build -v --disable-xctest
-          --filter "EdgeCase|EphemeralKeyManager|EncryptionTests"
-      - name: Run tests (PSK crypto)
-        run: >-
-          swift test --skip-build -v --disable-xctest
-          --filter "PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol"
-      - name: Run tests (messaging + queues + misc)
-        run: >-
-          swift test --skip-build -v --disable-xctest
-          --filter "MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
+          swift test -v
+          --filter "EnvelopeDecoder|ErrorRecovery|ChatError|EphemeralKeyManager|EncryptionTests|EdgeCase|PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol|MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
 
   cli:
     runs-on: ubuntu-latest

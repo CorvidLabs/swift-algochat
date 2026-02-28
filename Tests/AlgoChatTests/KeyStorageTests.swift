@@ -5,7 +5,7 @@ import Testing
 @testable import AlgoChat
 
 /// Tests for encryption key storage
-@Suite("Key Storage Tests", .serialized)
+@Suite("Key Storage Tests")
 struct KeyStorageTests {
 
     // MARK: - In-Memory Storage Tests (for testing without biometric)
