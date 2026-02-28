@@ -16,45 +16,23 @@ jobs:
       - name: Build
         run: swift build -v
 
-      # Run tests in small batches to avoid BoringSSL crashes (signal 4).
-      # Swift Testing runs matched suites concurrently — too many concurrent
-      # Curve25519 operations crash the process. Crypto-heavy suites use
-      # .serialized to limit parallelism within each suite, but suites still
-      # run concurrently with each other, so each batch must be small.
+      # Run all non-excluded tests in a single swift test invocation.
+      # Multiple invocations crash the runner (signal 4) — the Nth process
+      # dies on startup due to accumulated BoringSSL state.
+      # All crypto suites use .serialized trait.
       #
-      # Excluded suites:
-      #   - ForwardSecrecyProof: crashes in CI even alone (signal 4)
-      #   - LocalnetIntegrationTests: requires Docker/algokit localnet
-      #   - CustomAmountIntegrationTests: requires Docker/algokit localnet
-      #   - E2E simulation suites: crypto-heavy, tested separately
-      - name: Run tests (crypto core)
+      # Excluded: localnet tests, E2E simulations, ForwardSecrecyProof
+      - name: Run tests
         run: >-
           swift test -v
-          --filter "MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests|EphemeralKeyManagerTests"
-      - name: Run tests (encryption + edge cases)
-        run: >-
-          swift test -v
-          --filter "EncryptionTests/|EdgeCaseTests/"
-      - name: Run tests (key storage)
-        run: >-
-          swift test -v
-          --filter "KeyStorageTests/|FileKeyStorageTests"
-      - name: Run tests (PSK crypto)
-        run: >-
-          swift test -v
-          --filter "PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
-      - name: Run tests (error recovery)
-        run: >-
-          swift test -v
-          --filter "ErrorRecoveryTests"
-      - name: Run tests (envelope validation + decoder)
-        run: >-
-          swift test -v
-          --filter "ChatEnvelopeValidationTests|EnvelopeDecoderTests"
-      - name: Run tests (unit + misc)
-        run: >-
-          swift test -v
-          --filter "ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|ChatErrorTests|PSKEnvelopeTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests/|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
+          --skip LocalnetIntegration
+          --skip CustomAmountIntegration
+          --skip ForwardSecrecyProof
+          --skip MultiUserConversation
+          --skip SecurityBoundary
+          --skip KeyRotation
+          --skip LongTermUsage
+          --skip PSKSimulation
 
   cli:
     runs-on: ubuntu-latest
