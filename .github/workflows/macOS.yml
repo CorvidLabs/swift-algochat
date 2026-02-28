@@ -13,26 +13,18 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: swift build -v
-    # Run tests in 4 batches — matches main branch structure.
-    # Swift Testing runs matched suites concurrently; .serialized trait on
-    # crypto suites limits each to sequential execution within the suite.
-    # More than ~4 swift test invocations can crash the runner (signal 5),
-    # so we keep to exactly 4 batches.
-    #
-    # ForwardSecrecyProof and E2E/localnet suites are excluded.
-    - name: Run tests (crypto)
+    # Run all tests except localnet/E2E/proof suites in a single invocation.
+    # Multiple swift test invocations crash the runner (signal 5) due to
+    # accumulated CryptoKit/BoringSSL state. All crypto suites use
+    # .serialized to run tests sequentially within each suite.
+    - name: Run tests
       run: >-
         swift test -v
-        --filter "MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests|EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests"
-    - name: Run tests (key storage + PSK)
-      run: >-
-        swift test -v
-        --filter "KeyStorageTests|FileKeyStorageTests|PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
-    - name: Run tests (error handling + decoders)
-      run: >-
-        swift test -v
-        --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatEnvelopeValidationTests|ChatErrorTests|PSKEnvelopeTests"
-    - name: Run tests (unit + misc)
-      run: >-
-        swift test -v
-        --filter "ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
+        --skip "LocalnetIntegration"
+        --skip "CustomAmountIntegration"
+        --skip "ForwardSecrecyProof"
+        --skip "MultiUserConversation"
+        --skip "SecurityBoundary"
+        --skip "KeyRotation"
+        --skip "LongTermUsage"
+        --skip "PSKSimulation"
