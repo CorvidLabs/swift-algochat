@@ -13,29 +13,41 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: swift build -v
-    # Run tests in small batches — max 3 crypto-heavy suites per batch.
+    # Run tests in small batches — max 2 crypto-heavy suites per batch.
     # Swift Testing runs all matched suites concurrently; BoringSSL/CryptoKit
     # crashes (signal 5) when too many Curve25519 operations run in parallel.
-    - name: Run tests (encryptor + signatures)
+    - name: Run tests (encryptor + key derivation)
       run: >-
         swift test -v
-        --filter "MessageEncryptorTests|SignatureVerifierTests|KeyDerivationTests"
-    - name: Run tests (forward secrecy)
+        --filter "MessageEncryptorTests|KeyDerivationTests"
+    - name: Run tests (signatures + ephemeral keys)
       run: >-
         swift test -v
-        --filter "EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests"
-    - name: Run tests (key storage + proof)
+        --filter "SignatureVerifierTests|EphemeralKeyManagerTests"
+    - name: Run tests (encryption + edge cases)
       run: >-
         swift test -v
-        --filter "KeyStorageTests|FileKeyStorageTests|ForwardSecrecyProof"
-    - name: Run tests (PSK crypto)
+        --filter "EncryptionTests|EdgeCaseTests"
+    - name: Run tests (key storage)
       run: >-
         swift test -v
-        --filter "PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
-    - name: Run tests (error handling + decoders)
+        --filter "KeyStorageTests|FileKeyStorageTests"
+    - name: Run tests (forward secrecy proof)
       run: >-
         swift test -v
-        --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatEnvelopeValidationTests"
+        --filter "ForwardSecrecyProof"
+    - name: Run tests (PSK encryption)
+      run: >-
+        swift test -v
+        --filter "PSKEncryptionTests|PSKRatchetTests"
+    - name: Run tests (cross-protocol + decoders)
+      run: >-
+        swift test -v
+        --filter "CrossProtocolTests|EnvelopeDecoderTests"
+    - name: Run tests (error handling + validation)
+      run: >-
+        swift test -v
+        --filter "ErrorRecoveryTests|ChatEnvelopeValidationTests"
     - name: Run tests (unit + misc)
       run: >-
         swift test -v

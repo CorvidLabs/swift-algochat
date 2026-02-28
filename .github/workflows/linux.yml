@@ -16,17 +16,21 @@ jobs:
       - name: Build
         run: swift build -v
 
-      # Run tests in small batches — max 3 crypto-heavy suites per batch.
+      # Run tests in small batches — max 2 crypto-heavy suites per batch.
       # Swift Testing runs all matched suites concurrently; BoringSSL
       # crashes (signal 4/5) when too many Curve25519 operations run in parallel.
-      - name: Run tests (encryptor + signatures)
+      - name: Run tests (encryptor + key derivation)
         run: >-
           swift test -v
-          --filter "MessageEncryptorTests|SignatureVerifierTests|KeyDerivationTests"
-      - name: Run tests (forward secrecy)
+          --filter "MessageEncryptorTests|KeyDerivationTests"
+      - name: Run tests (signatures + ephemeral keys)
         run: >-
           swift test -v
-          --filter "EphemeralKeyManagerTests|EncryptionTests|EdgeCaseTests"
+          --filter "SignatureVerifierTests|EphemeralKeyManagerTests"
+      - name: Run tests (encryption + edge cases)
+        run: >-
+          swift test -v
+          --filter "EncryptionTests|EdgeCaseTests"
       - name: Run tests (key storage)
         run: >-
           swift test -v
@@ -35,14 +39,18 @@ jobs:
         run: >-
           swift test -v
           --filter "ForwardSecrecyProof"
-      - name: Run tests (PSK crypto)
+      - name: Run tests (PSK encryption)
         run: >-
           swift test -v
-          --filter "PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
-      - name: Run tests (error handling + decoders)
+          --filter "PSKEncryptionTests|PSKRatchetTests"
+      - name: Run tests (cross-protocol + decoders)
         run: >-
           swift test -v
-          --filter "ErrorRecoveryTests|EnvelopeDecoderTests|ChatEnvelopeValidationTests"
+          --filter "CrossProtocolTests|EnvelopeDecoderTests"
+      - name: Run tests (error handling + validation)
+        run: >-
+          swift test -v
+          --filter "ErrorRecoveryTests|ChatEnvelopeValidationTests"
       - name: Run tests (unit + misc)
         run: >-
           swift test -v
