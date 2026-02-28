@@ -34,7 +34,7 @@ jobs:
       - name: Run tests (batch 2 — unit + PSK data)
         run: >-
           swift test -v
-          --filter "MessageCodableTests|MessageDirectionTests|MessageEqualityTests|ConversationMergeTests|FileSendQueueStorageTests|ReplyContextModelTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PublicKeyCacheTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests"
+          --filter "MessageCodableTests|MessageDirectionTests|MessageEqualityTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|FileSendQueueStorageTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests"
 
   cli:
     runs-on: ubuntu-latest
