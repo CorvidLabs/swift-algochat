@@ -49,7 +49,7 @@ struct ChatErrorTests {
     }
 }
 
-@Suite("Error Recovery Tests")
+@Suite("Error Recovery Tests", .serialized)
 struct ErrorRecoveryTests {
     @Test("Malformed envelope data throws appropriate error")
     func testMalformedEnvelopeError() throws {
