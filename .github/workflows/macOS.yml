@@ -13,20 +13,31 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: swift build -v
-    # Run all non-excluded tests in a single swift test invocation.
-    # Multiple invocations crash the runner (signal 5) — the Nth process
-    # dies on startup due to accumulated CryptoKit state.
-    # All crypto suites use .serialized trait.
+    # Run tests in exactly 4 batches. Two constraints:
+    # 1. A single invocation with all crypto suites crashes (signal 5)
+    #    from too many concurrent Curve25519 operations
+    # 2. The 5th+ sequential swift test invocation crashes from
+    #    accumulated CryptoKit state
+    # So we use 4 batches with crypto suites distributed across 3.
     #
-    # Excluded: localnet tests, E2E simulations, ForwardSecrecyProof
-    - name: Run tests
+    # Excluded suites:
+    #   - ForwardSecrecyProof: crashes in CI even alone (signal 5)
+    #   - LocalnetIntegrationTests: requires Docker/algokit localnet
+    #   - CustomAmountIntegrationTests: requires Docker/algokit localnet
+    #   - E2E simulation suites: crypto-heavy, require dedicated runners
+    - name: Run tests (batch 1 — crypto core + error recovery)
       run: >-
         swift test -v
-        --skip LocalnetIntegration
-        --skip CustomAmountIntegration
-        --skip ForwardSecrecyProof
-        --skip MultiUserConversation
-        --skip SecurityBoundary
-        --skip KeyRotation
-        --skip LongTermUsage
-        --skip PSKSimulation
+        --filter "MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests|EphemeralKeyManagerTests|ErrorRecoveryTests"
+    - name: Run tests (batch 2 — encryption + validation)
+      run: >-
+        swift test -v
+        --filter "EncryptionTests|EdgeCaseTests|ChatEnvelopeValidationTests|EnvelopeDecoderTests"
+    - name: Run tests (batch 3 — key storage + PSK)
+      run: >-
+        swift test -v
+        --filter "KeyStorageTests|FileKeyStorageTests|PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
+    - name: Run tests (batch 4 — unit + misc)
+      run: >-
+        swift test -v
+        --filter "ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|ChatErrorTests|PSKEnvelopeTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests/|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
