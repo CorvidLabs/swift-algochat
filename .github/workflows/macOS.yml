@@ -11,30 +11,30 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: swift build -v
     # Run tests in small batches: Swift Testing executes all matched
     # tests concurrently, which can crash BoringSSL when too many
     # crypto operations run simultaneously.
+    - name: Build tests
+      run: swift build --build-tests -v
     - name: Run tests (ChatError)
-      run: swift test -v --filter "ChatError"
+      run: swift test --skip-build -v --disable-xctest --filter "ChatError"
     - name: Run tests (ErrorRecovery)
-      run: swift test -v --filter "ErrorRecovery"
+      run: swift test --skip-build -v --disable-xctest --filter "ErrorRecovery"
     - name: Run tests (EnvelopeDecoder)
-      run: swift test -v --filter "EnvelopeDecoder"
+      run: swift test --skip-build -v --disable-xctest --filter "EnvelopeDecoder"
     - name: Run tests (core crypto)
       run: >-
-        swift test -v
+        swift test --skip-build -v --disable-xctest
         --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
     - name: Run tests (forward secrecy)
       run: >-
-        swift test -v
+        swift test --skip-build -v --disable-xctest
         --filter "EdgeCase|EphemeralKeyManager|EncryptionTests"
     - name: Run tests (PSK crypto)
       run: >-
-        swift test -v
+        swift test --skip-build -v --disable-xctest
         --filter "PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol"
     - name: Run tests (messaging + queues + misc)
       run: >-
-        swift test -v
+        swift test --skip-build -v --disable-xctest
         --filter "MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
