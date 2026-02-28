@@ -4,7 +4,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("ChatEnvelope Validation Tests", .serialized)
+@Suite("ChatEnvelope Validation Tests")
 struct ChatEnvelopeValidationTests {
     @Test("Valid chat envelope has correct header bytes")
     func testValidEnvelopeHeader() throws {

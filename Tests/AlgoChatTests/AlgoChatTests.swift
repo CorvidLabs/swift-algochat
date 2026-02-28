@@ -68,7 +68,7 @@ struct ChatEnvelopeTests {
     }
 }
 
-@Suite("MessageEncryptor Tests", .serialized)
+@Suite("MessageEncryptor Tests")
 struct MessageEncryptorTests {
     @Test("Message encryption round trip")
     func testMessageEncryptionRoundTrip() throws {

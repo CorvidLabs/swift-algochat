@@ -16,34 +16,23 @@ jobs:
       - name: Build
         run: swift build -v
 
-      # Run tests in exactly 4 batches. Two constraints:
-      # 1. A single invocation with all crypto suites crashes (signal 4)
-      #    from too many concurrent Curve25519 operations
-      # 2. The 5th+ sequential swift test invocation crashes from
-      #    accumulated BoringSSL state
-      # So we use 4 batches with crypto suites distributed across 3.
+      # Run tests in 2 batches to minimize swift test invocations.
+      # Sequential invocations accumulate BoringSSL state that causes
+      # signal 4 crashes. Keep batch count as low as possible.
       #
-      # Excluded suites:
-      #   - ForwardSecrecyProof: crashes in CI even alone (signal 4)
+      # Excluded suites (crash in CI regardless of batching):
+      #   - ForwardSecrecyProof: signal 4 even when run alone
+      #   - E2E simulation suites: crypto-heavy, crash in CI
       #   - LocalnetIntegrationTests: requires Docker/algokit localnet
       #   - CustomAmountIntegrationTests: requires Docker/algokit localnet
-      #   - E2E simulation suites: crypto-heavy, require dedicated runners
-      - name: Run tests (batch 1 — crypto core + error recovery)
+      - name: Run tests (batch 1 — crypto + unit)
         run: >-
           swift test -v
-          --filter "MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests|EphemeralKeyManagerTests|ErrorRecoveryTests"
-      - name: Run tests (batch 2 — encryption + validation)
+          --filter "MessageEncryptorTests|KeyDerivationTests|SignatureVerifierTests|EphemeralKeyManagerTests|KeyStorageTests|FileKeyStorageTests|ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|ChatErrorTests|PSKEnvelopeTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests/|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
+      - name: Run tests (batch 2 — remaining crypto)
         run: >-
           swift test -v
-          --filter "EncryptionTests|EdgeCaseTests|ChatEnvelopeValidationTests|EnvelopeDecoderTests"
-      - name: Run tests (batch 3 — key storage + PSK)
-        run: >-
-          swift test -v
-          --filter "KeyStorageTests|FileKeyStorageTests|PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests"
-      - name: Run tests (batch 4 — unit + misc)
-        run: >-
-          swift test -v
-          --filter "ChatEnvelopeTests/|ChatEnvelopeForwardSecrecyTests|ChatErrorTests|PSKEnvelopeTests|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|FileSendQueueStorageTests|ConversationMergeTests|CustomAmountTests/|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|PendingMessageTests|SendQueueTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|ReplyContextTests|ReplyContextModelTests|SyncManagerTests|SyncManagerStorageTests|SyncManagerEdgeCaseTests|KeyStorageErrorTests|FileKeyStorageErrorTests"
+          --filter "EncryptionTests|EdgeCaseTests|PSKEncryptionTests|PSKRatchetTests|CrossProtocolTests|ErrorRecoveryTests|EnvelopeDecoderTests|ChatEnvelopeValidationTests"
 
   cli:
     runs-on: ubuntu-latest

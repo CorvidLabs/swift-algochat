@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("PSK Ratchet Derivation Tests", .serialized)
+@Suite("PSK Ratchet Derivation Tests")
 struct PSKRatchetTests {
     /// Test vector: initial PSK = 32 bytes of 0xAA
     private let initialPSK = Data(repeating: 0xAA, count: 32)

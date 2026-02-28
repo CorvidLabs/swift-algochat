@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("PSK Encryption Tests", .serialized)
+@Suite("PSK Encryption Tests")
 struct PSKEncryptionTests {
 
     // MARK: - Round-Trip

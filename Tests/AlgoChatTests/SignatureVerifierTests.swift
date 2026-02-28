@@ -4,7 +4,7 @@ import Foundation
 import Testing
 @testable import AlgoChat
 
-@Suite("SignatureVerifier Tests", .serialized)
+@Suite("SignatureVerifier Tests")
 struct SignatureVerifierTests {
     @Test("Sign and verify round trip succeeds")
     func testSignAndVerifyRoundTrip() throws {
