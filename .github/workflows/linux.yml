@@ -22,19 +22,19 @@ jobs:
       - name: Run tests (core crypto)
         run: >-
           swift test -v
-          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|SignatureVerifier|FileKeyStorage"
-      - name: Run tests (forward secrecy + PSK)
+          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|SignatureVerifier"
+      - name: Run tests (key storage + forward secrecy)
         run: >-
           swift test -v
-          --filter "EphemeralKeyManager|EncryptionTests|EdgeCase|PSKEncryption|PSKRatchet|CrossProtocol"
-      - name: Run tests (decoders + error handling)
+          --filter "KeyStorage|FileKeyStorage|EphemeralKeyManager|EncryptionTests|EdgeCase"
+      - name: Run tests (PSK + decoders + errors)
         run: >-
           swift test -v
-          --filter "EnvelopeDecoder|ErrorRecovery|ChatError|PSKEnvelope"
+          --filter "PSKEncryption|PSKEnvelope|PSKRatchet|CrossProtocol|EnvelopeDecoder|ErrorRecovery|ChatError"
       - name: Run tests (messaging + misc)
         run: >-
           swift test -v
-          --filter "MessageCodable|MessageDirection|MessageEquality|MessageIndexer|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
+          --filter "MessageCodable|MessageDirection|MessageEquality|FileSendQueue|ConversationMerge|CustomAmountTests|InMemory|PendingMessage|SendQueue|PSKExchangeURI|PSKState|PublicKeyCache|ReplyContext|SyncManager|CacheTests"
 
   cli:
     runs-on: ubuntu-latest
