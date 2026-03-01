@@ -290,21 +290,25 @@ public actor MessageIndexer {
         }
 
         let senderPublicKeyData: Data
-        let envelopeSize: Int
+        let headerSize: Int
         switch decoded {
         case .standard(let envelope):
             senderPublicKeyData = envelope.senderPublicKey
-            envelopeSize = envelope.encode().count
+            headerSize = ChatEnvelope.headerSize
         case .psk(let envelope):
             senderPublicKeyData = envelope.senderPublicKey
-            envelopeSize = envelope.encode().count
+            headerSize = PSKEnvelope.headerSize
         }
 
         let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
 
         // Check for appended Ed25519 signature (64 bytes after envelope)
-        let remainingBytes = noteData.count - envelopeSize
-        if remainingBytes == SignatureVerifier.signatureSize {
+        // Note: EnvelopeDecoder.decode absorbs all trailing bytes into ciphertext,
+        // so we can't use envelope.encode().count to find the boundary.
+        // Instead, check if the last 64 bytes form a valid signature.
+        // The minimum note size with a signature is: header + tag + signature
+        let minSizeWithSignature = headerSize + ChatEnvelope.tagSize + SignatureVerifier.signatureSize
+        if noteData.count >= minSizeWithSignature {
             let signature = noteData.suffix(SignatureVerifier.signatureSize)
             let isValid = (try? SignatureVerifier.verify(
                 encryptionPublicKey: senderPublicKeyData,
@@ -312,7 +316,9 @@ public actor MessageIndexer {
                 signature: Data(signature)
             )) ?? false
 
-            return DiscoveredKey(publicKey: publicKey, isVerified: isValid)
+            if isValid {
+                return DiscoveredKey(publicKey: publicKey, isVerified: true)
+            }
         }
 
         return DiscoveredKey(publicKey: publicKey, isVerified: false)
