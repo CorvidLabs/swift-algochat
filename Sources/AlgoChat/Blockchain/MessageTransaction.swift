@@ -58,6 +58,44 @@ public enum MessageTransaction {
         return try SignedTransaction.sign(tx, with: sender.account)
     }
 
+    /**
+     Creates a signed key-publish transaction with an Ed25519 signature
+
+     The note contains the envelope followed by a 64-byte Ed25519 signature
+     over the sender's X25519 encryption key. This proves the encryption key
+     was published by the holder of the Algorand account.
+
+     - Parameters:
+       - sender: The sending chat account
+       - envelope: The encrypted key-publish envelope
+       - keySignature: Ed25519 signature over the sender's encryption public key (64 bytes)
+       - params: Transaction parameters from the network
+     - Returns: Signed transaction
+     */
+    public static func createSignedKeyPublish(
+        from sender: ChatAccount,
+        envelope: ChatEnvelope,
+        keySignature: Data,
+        params: TransactionParams
+    ) throws -> SignedTransaction {
+        var noteData = envelope.encode()
+        noteData.append(keySignature)
+
+        guard noteData.count <= 1024 else {
+            throw ChatError.messageTooLarge(maxSize: 1024)
+        }
+
+        let tx = try PaymentTransactionBuilder()
+            .sender(sender.address)
+            .receiver(sender.address)
+            .amount(MicroAlgos(0))
+            .note(noteData)
+            .params(params)
+            .build()
+
+        return try SignedTransaction.sign(tx, with: sender.account)
+    }
+
     // MARK: - PSK Envelope Overloads
 
     /**
