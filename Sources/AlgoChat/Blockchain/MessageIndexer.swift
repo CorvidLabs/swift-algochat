@@ -187,7 +187,10 @@ public actor MessageIndexer {
             }
 
             let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
-            return DiscoveredKey(publicKey: publicKey, isVerified: true)
+            // Keys extracted from message envelopes are unverified — the envelope
+            // contains no Ed25519 signature proving the key belongs to the sender.
+            // Only keys from signed key announcements (V3) should be marked verified.
+            return DiscoveredKey(publicKey: publicKey, isVerified: false)
         }
 
         throw ChatError.publicKeyNotFound(address.description)
