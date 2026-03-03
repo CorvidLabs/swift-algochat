@@ -166,6 +166,9 @@ public actor MessageIndexer {
             limit: searchDepth
         )
 
+        // Track the best unverified key as fallback
+        var unverifiedKey: DiscoveredKey?
+
         for tx in response.transactions {
             guard tx.sender == address.description,
                   let noteData = tx.noteData,
@@ -173,24 +176,31 @@ public actor MessageIndexer {
                 continue
             }
 
-            // Try to decode as either standard or PSK envelope
-            guard let decoded = try? EnvelopeDecoder.decode(from: noteData) else {
+            guard let discoveredKey = try? Self.extractKey(
+                from: noteData,
+                senderAddress: address
+            ) else {
                 continue
             }
 
-            let senderPublicKeyData: Data
-            switch decoded {
-            case .standard(let envelope):
-                senderPublicKeyData = envelope.senderPublicKey
-            case .psk(let envelope):
-                senderPublicKeyData = envelope.senderPublicKey
+            // Prefer verified keys from signed self-transfers
+            let isSelfTransfer = tx.paymentTransaction?.receiver == address.description
+            if isSelfTransfer, discoveredKey.isVerified {
+                return discoveredKey
             }
 
-            let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
-            // Keys extracted from message envelopes are unverified — the envelope
-            // contains no Ed25519 signature proving the key belongs to the sender.
-            // Only keys from signed key announcements (V3) should be marked verified.
-            return DiscoveredKey(publicKey: publicKey, isVerified: false)
+            // Save first unverified key as fallback
+            if unverifiedKey == nil {
+                unverifiedKey = DiscoveredKey(
+                    publicKey: discoveredKey.publicKey,
+                    isVerified: false
+                )
+            }
+        }
+
+        // Return unverified key if no verified one was found
+        if let unverifiedKey {
+            return unverifiedKey
         }
 
         throw ChatError.publicKeyNotFound(address.description)
@@ -251,6 +261,67 @@ public actor MessageIndexer {
         }
 
         return false
+    }
+
+    // MARK: - Key Verification
+
+    /**
+     Checks if note data contains a verified key announcement
+
+     A signed key announcement is a standard ChatEnvelope with a 64-byte
+     Ed25519 signature appended. The signature is over the sender's X25519
+     encryption public key.
+
+     - Parameters:
+       - noteData: The raw transaction note data
+       - senderAddress: The Algorand address of the transaction sender
+     - Returns: The discovered key with verification status, or nil if not a chat message
+     */
+    public static func extractKey(
+        from noteData: Data,
+        senderAddress: Address
+    ) throws -> DiscoveredKey? {
+        guard EnvelopeDecoder.isChatMessage(noteData) else {
+            return nil
+        }
+
+        guard let decoded = try? EnvelopeDecoder.decode(from: noteData) else {
+            return nil
+        }
+
+        let senderPublicKeyData: Data
+        let headerSize: Int
+        switch decoded {
+        case .standard(let envelope):
+            senderPublicKeyData = envelope.senderPublicKey
+            headerSize = ChatEnvelope.headerSize
+        case .psk(let envelope):
+            senderPublicKeyData = envelope.senderPublicKey
+            headerSize = PSKEnvelope.headerSize
+        }
+
+        let publicKey = try KeyDerivation.decodePublicKey(from: senderPublicKeyData)
+
+        // Check for appended Ed25519 signature (64 bytes after envelope)
+        // Note: EnvelopeDecoder.decode absorbs all trailing bytes into ciphertext,
+        // so we can't use envelope.encode().count to find the boundary.
+        // Instead, check if the last 64 bytes form a valid signature.
+        // The minimum note size with a signature is: header + tag + signature
+        let minSizeWithSignature = headerSize + ChatEnvelope.tagSize + SignatureVerifier.signatureSize
+        if noteData.count >= minSizeWithSignature {
+            let signature = noteData.suffix(SignatureVerifier.signatureSize)
+            let isValid = (try? SignatureVerifier.verify(
+                encryptionPublicKey: senderPublicKeyData,
+                signedBy: senderAddress,
+                signature: Data(signature)
+            )) ?? false
+
+            if isValid {
+                return DiscoveredKey(publicKey: publicKey, isVerified: true)
+            }
+        }
+
+        return DiscoveredKey(publicKey: publicKey, isVerified: false)
     }
 
     // MARK: - Private
