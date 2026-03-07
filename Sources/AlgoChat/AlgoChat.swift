@@ -501,16 +501,22 @@ public actor AlgoChat {
             recipientPublicKey: account.encryptionPublicKey
         )
 
+        // Sign the encryption public key with the account's Ed25519 key
+        // This proves the encryption key was published by the account owner
+        let keySignature = try SignatureVerifier.sign(
+            encryptionPublicKey: account.encryptionPublicKey.rawRepresentation,
+            with: account.account
+        )
+
         // Get transaction parameters
         let params = try await algokit.algodClient.transactionParams()
 
-        // Create zero-value self-payment (just publishes the key in the note)
-        let signedTx = try MessageTransaction.createSigned(
+        // Create zero-value self-payment with signed key announcement
+        let signedTx = try MessageTransaction.createSignedKeyPublish(
             from: account,
-            to: account.address,
             envelope: envelope,
-            params: params,
-            amount: MicroAlgos(0)
+            keySignature: keySignature,
+            params: params
         )
 
         // Submit transaction
