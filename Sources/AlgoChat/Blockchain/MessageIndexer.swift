@@ -148,35 +148,79 @@ public actor MessageIndexer {
     /**
      Finds a user's encryption public key from their past transactions
 
-     Searches the user's transaction history to find an AlgoChat message
-     containing their public key.
+     Paginates through the user's full transaction history using cursor-based
+     pagination until a key announcement is found, removing the previous
+     static search depth limit.
 
      - Parameters:
        - address: The user's Algorand address
-       - searchDepth: Number of transactions to search (default: 200)
+       - pageSize: Number of transactions to fetch per page (default: 200)
      - Returns: The discovered key
      - Throws: `ChatError.publicKeyNotFound` if no chat history exists
      */
     public func findPublicKey(
         for address: Address,
-        searchDepth: Int = 200
+        pageSize: Int = 200
     ) async throws -> DiscoveredKey {
-        let response = try await indexerClient.searchTransactions(
-            address: address,
-            limit: searchDepth
-        )
-
-        // Track the best unverified key as fallback
+        var nextToken: String? = nil
         var unverifiedKey: DiscoveredKey?
 
-        for tx in response.transactions {
+        repeat {
+            let response = try await indexerClient.searchTransactions(
+                address: address,
+                limit: pageSize,
+                next: nextToken
+            )
+
+            let result = Self.scanForKeyAnnouncement(
+                transactions: response.transactions,
+                address: address
+            )
+
+            // Return immediately if we found a verified key
+            if let verified = result.verified {
+                return verified
+            }
+
+            // Track first unverified key as fallback
+            if unverifiedKey == nil {
+                unverifiedKey = result.unverified
+            }
+
+            nextToken = response.nextToken
+        } while nextToken != nil
+
+        // Return unverified key if no verified one was found
+        if let unverifiedKey {
+            return unverifiedKey
+        }
+
+        throw ChatError.publicKeyNotFound(address.description)
+    }
+
+    /// Result of scanning a batch of transactions for key announcements.
+    struct KeyScanResult {
+        /// A verified key found in this batch (returned immediately).
+        let verified: DiscoveredKey?
+        /// The first unverified key found (used as fallback).
+        let unverified: DiscoveredKey?
+    }
+
+    /// Scans a batch of transactions for key announcements from the given address.
+    static func scanForKeyAnnouncement(
+        transactions: [IndexerTransaction],
+        address: Address
+    ) -> KeyScanResult {
+        var unverified: DiscoveredKey?
+
+        for tx in transactions {
             guard tx.sender == address.description,
                   let noteData = tx.noteData,
-                  isChatMessage(noteData) else {
+                  EnvelopeDecoder.isChatMessage(noteData) else {
                 continue
             }
 
-            guard let discoveredKey = try? Self.extractKey(
+            guard let discoveredKey = try? extractKey(
                 from: noteData,
                 senderAddress: address
             ) else {
@@ -186,24 +230,19 @@ public actor MessageIndexer {
             // Prefer verified keys from signed self-transfers
             let isSelfTransfer = tx.paymentTransaction?.receiver == address.description
             if isSelfTransfer, discoveredKey.isVerified {
-                return discoveredKey
+                return KeyScanResult(verified: discoveredKey, unverified: nil)
             }
 
             // Save first unverified key as fallback
-            if unverifiedKey == nil {
-                unverifiedKey = DiscoveredKey(
+            if unverified == nil {
+                unverified = DiscoveredKey(
                     publicKey: discoveredKey.publicKey,
                     isVerified: false
                 )
             }
         }
 
-        // Return unverified key if no verified one was found
-        if let unverifiedKey {
-            return unverifiedKey
-        }
-
-        throw ChatError.publicKeyNotFound(address.description)
+        return KeyScanResult(verified: nil, unverified: unverified)
     }
 
     /**
