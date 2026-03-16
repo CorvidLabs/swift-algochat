@@ -242,8 +242,8 @@ struct EnvelopeSecurityTests {
         )
 
         // Tamper with the encrypted sender key
-        var tamperedKey = envelope.encryptedSenderKey
-        tamperedKey[0] ^= 0xFF
+        var tamperedKey = Data(envelope.encryptedSenderKey)
+        tamperedKey[tamperedKey.startIndex] ^= 0xFF
 
         let tampered = ChatEnvelope(
             senderPublicKey: envelope.senderPublicKey,
