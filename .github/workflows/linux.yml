@@ -30,7 +30,7 @@ jobs:
       - name: Run tests (batch 1 — crypto + envelope)
         run: >-
           swift test -v
-          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage"
+          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|EnvelopeSecurity"
       - name: Run tests (batch 2 — unit + non-crypto)
         run: >-
           swift test -v
