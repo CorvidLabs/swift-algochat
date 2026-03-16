@@ -48,7 +48,7 @@ jobs:
       - name: Run tests (batch 1 — crypto + envelope)
         run: >-
           swift test -v
-          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|KeyVerification"
+          --filter "ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|KeyVerification|EnvelopeSecurity"
       - name: Run tests (batch 2 — unit + non-crypto)
         run: >-
           swift test -v
