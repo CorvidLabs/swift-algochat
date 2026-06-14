@@ -3,15 +3,33 @@ name: Linux
 on:
   push:
     branches: ["main"]
+    paths:
+      - "Sources/**"
+      - "Tests/**"
+      - "Package.swift"
+      - "Package.resolved"
+      - ".github/workflows/linux.yml"
   pull_request:
     branches: ["main"]
+    paths:
+      - "Sources/**"
+      - "Tests/**"
+      - "Package.swift"
+      - "Package.resolved"
+      - ".github/workflows/linux.yml"
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    # Deliberate Linux compile via the official swift:6.0 container on GitHub-hosted Linux.
     runs-on: ubuntu-latest
     container: swift:6.0
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build
         run: swift build -v
@@ -39,8 +57,9 @@ jobs:
   cli:
     runs-on: ubuntu-latest
     container: swift:6.0
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build CLI
         run: swift build --product algochat -v
