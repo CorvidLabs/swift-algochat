@@ -6,6 +6,10 @@ import Foundation
 import Security
 #endif
 
+#if canImport(CommonCrypto)
+import CommonCrypto
+#endif
+
 /**
  File-based encryption key storage with password protection
 
@@ -109,8 +113,8 @@ public actor FileKeyStorage: EncryptionKeyStorage {
         let directory = try keyStorageDirectory()
 
         // Generate random salt and nonce
-        let salt = generateRandomBytes(count: Self.saltSize)
-        let nonce = generateRandomBytes(count: Self.nonceSize)
+        let salt = try generateRandomBytes(count: Self.saltSize)
+        let nonce = try generateRandomBytes(count: Self.nonceSize)
 
         // Derive encryption key from password
         let derivedKey = try deriveKey(from: password, salt: salt)
@@ -255,22 +259,29 @@ public actor FileKeyStorage: EncryptionKeyStorage {
     }
 
     /// Generates cryptographically secure random bytes
-    private func generateRandomBytes(count: Int) -> Data {
+    ///
+    /// Uses the platform CSPRNG (`SecRandomCopyBytes` on Apple platforms,
+    /// `/dev/urandom` on Linux) rather than a non-cryptographic generator.
+    ///
+    /// - Parameter count: The number of random bytes to generate
+    /// - Returns: The generated random bytes
+    /// - Throws: `KeyStorageError.storageFailed` if secure randomness is unavailable
+    private func generateRandomBytes(count: Int) throws -> Data {
         var bytes = [UInt8](repeating: 0, count: count)
         #if canImport(Security)
         let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
         guard status == errSecSuccess else {
-            fatalError("Failed to generate secure random bytes")
+            throw KeyStorageError.storageFailed("Failed to generate secure random bytes")
         }
         #else
         // Linux: use /dev/urandom which is cryptographically secure
         guard let urandom = FileHandle(forReadingAtPath: "/dev/urandom") else {
-            fatalError("Failed to open /dev/urandom")
+            throw KeyStorageError.storageFailed("Failed to open /dev/urandom")
         }
+        defer { try? urandom.close() }
         let randomData = urandom.readData(ofLength: count)
-        urandom.closeFile()
         guard randomData.count == count else {
-            fatalError("Failed to read enough random bytes from /dev/urandom")
+            throw KeyStorageError.storageFailed("Failed to read enough random bytes from /dev/urandom")
         }
         bytes = [UInt8](randomData)
         #endif
@@ -290,10 +301,24 @@ public actor FileKeyStorage: EncryptionKeyStorage {
 
 // MARK: - PBKDF2 Implementation
 
-/// PBKDF2 key derivation using swift-crypto
-private enum PBKDF2<Hash: HashFunction> {
+/**
+ PBKDF2-HMAC-SHA256 key derivation (RFC 8018)
+
+ This is a real PBKDF2 implementation so that derived keys are
+ interoperable with the reference implementations (rs/py) and match the
+ crypto spec: PBKDF2-HMAC-SHA256 with 100,000 iterations, producing a
+ 32-byte AES-256 key.
+
+ On Apple platforms `CCKeyDerivationPBKDF` from CommonCrypto is used.
+ On other platforms (e.g. Linux) a vetted RFC 8018 implementation built on
+ swift-crypto's `HMAC<SHA256>` is used.
+
+ - Note: Only SHA-256 is supported; the generic `Hash` parameter exists to
+   preserve the call site, but a non-SHA-256 hash is rejected at runtime.
+ */
+internal enum PBKDF2<Hash: HashFunction> {
     /**
-     Derives a symmetric key from a password
+     Derives a symmetric key from a password using PBKDF2-HMAC-SHA256
 
      - Parameters:
        - password: The password data
@@ -301,33 +326,124 @@ private enum PBKDF2<Hash: HashFunction> {
        - iterations: Number of PBKDF2 iterations
        - keyByteCount: Desired output key length in bytes
      - Returns: The derived symmetric key
+     - Throws: `KeyStorageError.storageFailed` if derivation fails
      */
-    static func deriveKey(
+    internal static func deriveKey(
         from password: Data,
         salt: Data,
         iterations: Int,
         keyByteCount: Int
     ) throws -> SymmetricKey {
-        // Use HKDF as a PBKDF2 approximation with the password as input
-        // Note: For a proper PBKDF2, we'd need to implement the full algorithm
-        // but swift-crypto doesn't expose raw PBKDF2. We use HKDF with
-        // password hashing for a secure alternative.
-
-        // Hash the password with salt multiple times to simulate PBKDF2
-        var derived = password + salt
-        for _ in 0..<iterations {
-            derived = Data(Hash.hash(data: derived))
+        guard Hash.self == SHA256.self else {
+            throw KeyStorageError.storageFailed("PBKDF2 only supports SHA-256")
         }
 
-        // Final derivation using HKDF
-        let inputKey = SymmetricKey(data: derived)
-        let outputKey = HKDF<Hash>.deriveKey(
-            inputKeyMaterial: inputKey,
+        let derived = try pbkdf2HMACSHA256(
+            password: password,
             salt: salt,
-            info: Data("AlgoChat-FileKeyStorage-v1".utf8),
-            outputByteCount: keyByteCount
+            iterations: iterations,
+            keyByteCount: keyByteCount
         )
 
-        return outputKey
+        return SymmetricKey(data: derived)
+    }
+
+    /// Performs PBKDF2-HMAC-SHA256, dispatching to CommonCrypto when available.
+    private static func pbkdf2HMACSHA256(
+        password: Data,
+        salt: Data,
+        iterations: Int,
+        keyByteCount: Int
+    ) throws -> Data {
+        #if canImport(CommonCrypto)
+        var derived = [UInt8](repeating: 0, count: keyByteCount)
+        let status = derived.withUnsafeMutableBytes { derivedBytes -> Int32 in
+            password.withUnsafeBytes { passwordBytes -> Int32 in
+                salt.withUnsafeBytes { saltBytes -> Int32 in
+                    guard
+                        let derivedBase = derivedBytes.baseAddress,
+                        let saltBase = saltBytes.baseAddress
+                    else {
+                        return Int32(kCCParamError)
+                    }
+                    let passwordBase = passwordBytes.baseAddress?
+                        .assumingMemoryBound(to: CChar.self)
+                    return CCKeyDerivationPBKDF(
+                        CCPBKDFAlgorithm(kCCPBKDF2),
+                        passwordBase,
+                        passwordBytes.count,
+                        saltBase.assumingMemoryBound(to: UInt8.self),
+                        saltBytes.count,
+                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+                        UInt32(iterations),
+                        derivedBase.assumingMemoryBound(to: UInt8.self),
+                        keyByteCount
+                    )
+                }
+            }
+        }
+
+        guard status == kCCSuccess else {
+            throw KeyStorageError.storageFailed("PBKDF2 derivation failed (status \(status))")
+        }
+
+        return Data(derived)
+        #else
+        return try pbkdf2HMACSHA256Pure(
+            password: password,
+            salt: salt,
+            iterations: iterations,
+            keyByteCount: keyByteCount
+        )
+        #endif
+    }
+
+    /**
+     Pure-Swift PBKDF2-HMAC-SHA256 per RFC 8018, built on swift-crypto HMAC.
+
+     Used on platforms without CommonCrypto (e.g. Linux). Produces identical
+     output to CommonCrypto and the reference implementations.
+     */
+    private static func pbkdf2HMACSHA256Pure(
+        password: Data,
+        salt: Data,
+        iterations: Int,
+        keyByteCount: Int
+    ) throws -> Data {
+        guard iterations > 0, keyByteCount > 0 else {
+            throw KeyStorageError.storageFailed("Invalid PBKDF2 parameters")
+        }
+
+        let key = SymmetricKey(data: password)
+        let hLen = SHA256.byteCount
+        let blockCount = Int((Double(keyByteCount) / Double(hLen)).rounded(.up))
+
+        var output = Data()
+        output.reserveCapacity(blockCount * hLen)
+
+        for block in 1...blockCount {
+            // INT(block): 4-byte big-endian block index
+            var blockIndex = UInt32(block).bigEndian
+            var saltBlock = salt
+            withUnsafeBytes(of: &blockIndex) { saltBlock.append(contentsOf: $0) }
+
+            // U_1 = HMAC(password, salt || INT(block))
+            var u = Data(HMAC<SHA256>.authenticationCode(for: saltBlock, using: key))
+            var result = u
+
+            // U_2 .. U_c, XOR-accumulated into result
+            if iterations > 1 {
+                for _ in 2...iterations {
+                    u = Data(HMAC<SHA256>.authenticationCode(for: u, using: key))
+                    for index in 0..<hLen {
+                        result[index] ^= u[index]
+                    }
+                }
+            }
+
+            output.append(result)
+        }
+
+        return output.prefix(keyByteCount)
     }
 }
