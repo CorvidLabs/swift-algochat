@@ -349,6 +349,67 @@ struct FileKeyStorageTests {
         let fileData = try Data(contentsOf: keyPath)
         #expect(fileData.count == 92)
     }
+
+    // MARK: - PBKDF2 Test Vector Tests
+
+    /// Converts a hex string into bytes for comparison with derived keys.
+    private func hexBytes(_ hex: String) -> [UInt8] {
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let next = hex.index(index, offsetBy: 2)
+            if let byte = UInt8(hex[index..<next], radix: 16) {
+                bytes.append(byte)
+            }
+            index = next
+        }
+        return bytes
+    }
+
+    @Test("PBKDF2-HMAC-SHA256 matches known test vectors")
+    func testPBKDF2KnownVectors() throws {
+        // Known-answer vectors for PBKDF2-HMAC-SHA256, dkLen = 32.
+        // Cross-checked against Python's hashlib.pbkdf2_hmac('sha256', ...).
+        //   password="password", salt="salt"
+        let password = Data("password".utf8)
+        let salt = Data("salt".utf8)
+
+        let vectors: [(iterations: Int, expectedHex: String)] = [
+            (1, "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"),
+            (2, "ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43"),
+            (4096, "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a")
+        ]
+
+        for vector in vectors {
+            let derived = try PBKDF2<SHA256>.deriveKey(
+                from: password,
+                salt: salt,
+                iterations: vector.iterations,
+                keyByteCount: 32
+            )
+
+            let derivedBytes = derived.withUnsafeBytes { Array($0) }
+            #expect(derivedBytes == hexBytes(vector.expectedHex))
+        }
+    }
+
+    @Test("PBKDF2 supports output lengths other than the hash size")
+    func testPBKDF2LongerOutput() throws {
+        // password="passwd", salt="salt", iterations=1, dkLen=64
+        // Cross-checked against Python's hashlib.pbkdf2_hmac.
+        let derived = try PBKDF2<SHA256>.deriveKey(
+            from: Data("passwd".utf8),
+            salt: Data("salt".utf8),
+            iterations: 1,
+            keyByteCount: 64
+        )
+
+        let expected = "55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc"
+            + "49ca9cccf179b645991664b39d77ef317c71b845b1e30bd509112041d3a19783"
+        let derivedBytes = derived.withUnsafeBytes { Array($0) }
+        #expect(derivedBytes == hexBytes(expected))
+    }
 }
 
 @Suite("FileKeyStorage Error Description Tests")

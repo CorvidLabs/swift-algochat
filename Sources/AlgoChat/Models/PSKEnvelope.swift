@@ -78,11 +78,14 @@ public struct PSKEnvelope: Sendable {
         precondition(encryptedSenderKey.count == 48, "Encrypted sender key must be 48 bytes")
         precondition(nonce.count == 12, "Nonce must be 12 bytes")
         self.ratchetCounter = ratchetCounter
-        self.senderPublicKey = senderPublicKey
-        self.ephemeralPublicKey = ephemeralPublicKey
-        self.nonce = nonce
-        self.encryptedSenderKey = encryptedSenderKey
-        self.ciphertext = ciphertext
+        // Re-base every field to a zero-indexed Data so integer subscripting
+        // (e.g. `ciphertext[0]`) never traps. CryptoKit sealed-box outputs and
+        // Data slice concatenation can carry a non-zero startIndex.
+        self.senderPublicKey = Data([UInt8](senderPublicKey))
+        self.ephemeralPublicKey = Data([UInt8](ephemeralPublicKey))
+        self.nonce = Data([UInt8](nonce))
+        self.encryptedSenderKey = Data([UInt8](encryptedSenderKey))
+        self.ciphertext = Data([UInt8](ciphertext))
     }
 
     // MARK: - Encoding

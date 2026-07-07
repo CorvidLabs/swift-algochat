@@ -74,11 +74,15 @@ public struct ChatEnvelope: Sendable {
         precondition(ephemeralPublicKey.count == 32, "Ephemeral public key must be 32 bytes")
         precondition(encryptedSenderKey.count == 48, "Encrypted sender key must be 48 bytes")
         precondition(nonce.count == 12, "Nonce must be 12 bytes")
-        self.senderPublicKey = senderPublicKey
-        self.ephemeralPublicKey = ephemeralPublicKey
-        self.encryptedSenderKey = encryptedSenderKey
-        self.nonce = nonce
-        self.ciphertext = ciphertext
+        // Re-base every field to a zero-indexed Data. CryptoKit sealed-box
+        // outputs (and Data slice concatenation) can carry a non-zero
+        // startIndex, which makes integer subscripting like `ciphertext[0]`
+        // trap. Normalizing here keeps the public Data fields safe to index.
+        self.senderPublicKey = Data([UInt8](senderPublicKey))
+        self.ephemeralPublicKey = Data([UInt8](ephemeralPublicKey))
+        self.encryptedSenderKey = Data([UInt8](encryptedSenderKey))
+        self.nonce = Data([UInt8](nonce))
+        self.ciphertext = Data([UInt8](ciphertext))
     }
 
     // MARK: - Encoding
