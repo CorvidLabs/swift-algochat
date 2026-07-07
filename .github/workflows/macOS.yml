@@ -31,4 +31,4 @@ jobs:
     - name: Run tests (batch 2 — unit + non-crypto)
       run: >-
         swift test -v
-        --filter "ChatErrorTests|CustomAmountTests/|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|ConversationMergeTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|FileSendQueueStorageTests|ReplyContextModelTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests"
+        --filter "ChatErrorTests|CustomAmountTests/|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|ConversationMergeTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|FileSendQueueStorageTests|ReplyContextModelTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|DiscoveredKeyTests|PSKRatchetTests"
