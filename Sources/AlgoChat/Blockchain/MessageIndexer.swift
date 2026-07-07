@@ -3,9 +3,35 @@ import AlgoKit
 @preconcurrency import Crypto
 import Foundation
 
+/// Protocol for searching transactions, enabling mock injection for tests
+public protocol TransactionSearching: Sendable {
+    func searchTransactions(
+        address: Address?,
+        limit: Int,
+        next: String?,
+        minRound: UInt64?,
+        maxRound: UInt64?
+    ) async throws -> TransactionsResponse
+}
+
+extension TransactionSearching {
+    /// Convenience with defaults for optional parameters
+    public func searchTransactions(
+        address: Address? = nil,
+        limit: Int = 100,
+        next: String? = nil,
+        minRound: UInt64? = nil,
+        maxRound: UInt64? = nil
+    ) async throws -> TransactionsResponse {
+        try await searchTransactions(address: address, limit: limit, next: next, minRound: minRound, maxRound: maxRound)
+    }
+}
+
+extension IndexerClient: TransactionSearching {}
+
 /// Queries and retrieves messages from the blockchain
 public actor MessageIndexer {
-    private let indexerClient: IndexerClient
+    private let indexerClient: any TransactionSearching
     private let chatAccount: ChatAccount
 
     /// Optional PSK manager for decrypting PSK messages
@@ -16,6 +42,13 @@ public actor MessageIndexer {
 
     public init(indexerClient: IndexerClient, chatAccount: ChatAccount, pskManager: PSKManager? = nil) {
         self.indexerClient = indexerClient
+        self.chatAccount = chatAccount
+        self.pskManager = pskManager
+    }
+
+    /// Creates a MessageIndexer with a custom transaction searcher (for testing)
+    public init(transactionSearcher: any TransactionSearching, chatAccount: ChatAccount, pskManager: PSKManager? = nil) {
+        self.indexerClient = transactionSearcher
         self.chatAccount = chatAccount
         self.pskManager = pskManager
     }
@@ -145,11 +178,93 @@ public actor MessageIndexer {
             .sorted { ($0.lastMessage?.timestamp ?? .distantPast) > ($1.lastMessage?.timestamp ?? .distantPast) }
     }
 
+    /// Default page size for key discovery pagination
+    public static let defaultDiscoveryPageSize = 50
+
     /**
      Finds a user's encryption public key from their past transactions
 
-     Searches the user's transaction history to find an AlgoChat message
-     containing their public key.
+     Searches the user's transaction history using paginated indexer queries
+     to find an AlgoChat message containing their public key.
+
+     By default the search is exhaustive — all pages are fetched until the key
+     is found or the address history is fully scanned. Pass `maxPages` to cap
+     the number of indexer round-trips.
+
+     - Parameters:
+       - address: The user's Algorand address
+       - pageSize: Transactions per page (default: 50)
+       - maxPages: Maximum pages to fetch, or nil for exhaustive (default: nil)
+     - Returns: The discovered key
+     - Throws: `ChatError.publicKeyNotFound` if no chat history exists
+     */
+    public func findPublicKey(
+        for address: Address,
+        pageSize: Int = defaultDiscoveryPageSize,
+        maxPages: Int? = nil
+    ) async throws -> DiscoveredKey {
+        var nextToken: String? = nil
+        var unverifiedKey: DiscoveredKey?
+        var pagesSearched = 0
+
+        repeat {
+            let response = try await indexerClient.searchTransactions(
+                address: address,
+                limit: pageSize,
+                next: nextToken
+            )
+
+            for tx in response.transactions {
+                guard tx.sender == address.description,
+                      let noteData = tx.noteData,
+                      isChatMessage(noteData) else {
+                    continue
+                }
+
+                guard let discoveredKey = try? Self.extractKey(
+                    from: noteData,
+                    senderAddress: address
+                ) else {
+                    continue
+                }
+
+                // Prefer verified keys from signed self-transfers
+                let isSelfTransfer = tx.paymentTransaction?.receiver == address.description
+                if isSelfTransfer, discoveredKey.isVerified {
+                    return discoveredKey
+                }
+
+                // Save first unverified key as fallback
+                if unverifiedKey == nil {
+                    unverifiedKey = DiscoveredKey(
+                        publicKey: discoveredKey.publicKey,
+                        isVerified: false
+                    )
+                }
+            }
+
+            nextToken = response.nextToken
+            pagesSearched += 1
+
+            // Stop if we've hit the page limit
+            if let maxPages, pagesSearched >= maxPages {
+                break
+            }
+        } while nextToken != nil
+
+        // Return unverified key if no verified one was found
+        if let unverifiedKey {
+            return unverifiedKey
+        }
+
+        throw ChatError.publicKeyNotFound(address.description)
+    }
+
+    /**
+     Finds a user's encryption public key with a fixed search depth
+
+     Convenience method for backward compatibility. Equivalent to searching
+     a single page of the given size.
 
      - Parameters:
        - address: The user's Algorand address
@@ -159,51 +274,9 @@ public actor MessageIndexer {
      */
     public func findPublicKey(
         for address: Address,
-        searchDepth: Int = 200
+        searchDepth: Int
     ) async throws -> DiscoveredKey {
-        let response = try await indexerClient.searchTransactions(
-            address: address,
-            limit: searchDepth
-        )
-
-        // Track the best unverified key as fallback
-        var unverifiedKey: DiscoveredKey?
-
-        for tx in response.transactions {
-            guard tx.sender == address.description,
-                  let noteData = tx.noteData,
-                  isChatMessage(noteData) else {
-                continue
-            }
-
-            guard let discoveredKey = try? Self.extractKey(
-                from: noteData,
-                senderAddress: address
-            ) else {
-                continue
-            }
-
-            // Prefer verified keys from signed self-transfers
-            let isSelfTransfer = tx.paymentTransaction?.receiver == address.description
-            if isSelfTransfer, discoveredKey.isVerified {
-                return discoveredKey
-            }
-
-            // Save first unverified key as fallback
-            if unverifiedKey == nil {
-                unverifiedKey = DiscoveredKey(
-                    publicKey: discoveredKey.publicKey,
-                    isVerified: false
-                )
-            }
-        }
-
-        // Return unverified key if no verified one was found
-        if let unverifiedKey {
-            return unverifiedKey
-        }
-
-        throw ChatError.publicKeyNotFound(address.description)
+        try await findPublicKey(for: address, pageSize: searchDepth, maxPages: 1)
     }
 
     /**

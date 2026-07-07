@@ -464,14 +464,22 @@ public actor AlgoChat {
      Unlike `fetchPublicKey`, this method returns whether the key was
      cryptographically verified via a V3 signed envelope.
 
-     - Parameter address: The user's Algorand address
+     By default the search is exhaustive — all indexer pages are fetched
+     until the key is found. Pass `maxPages` to limit indexer round-trips.
+
+     - Parameters:
+       - address: The user's Algorand address
+       - pageSize: Transactions per indexer page (default: 50)
+       - maxPages: Maximum pages to fetch, or nil for exhaustive (default: nil)
      - Returns: The discovered key with verification status
      - Throws: `ChatError.publicKeyNotFound` if no chat history exists
      */
     public func discoverKey(
-        for address: Address
+        for address: Address,
+        pageSize: Int = MessageIndexer.defaultDiscoveryPageSize,
+        maxPages: Int? = nil
     ) async throws -> DiscoveredKey {
-        try await indexer.findPublicKey(for: address)
+        try await indexer.findPublicKey(for: address, pageSize: pageSize, maxPages: maxPages)
     }
 
     /**
