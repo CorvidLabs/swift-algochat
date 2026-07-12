@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "CHG-0001-adopt-specsync-5-0-1-and-trust-1-0-0-governance-for-swift-algochat",
+  "slug": "adopt-specsync-5-0-1-and-trust-1-0-0-governance-for-swift-algochat",
+  "title": "Adopt SpecSync 5.0.1 and Trust 1.0.0 governance for Swift AlgoChat",
+  "description": "Adopt SpecSync 5.0.1 and Trust 1.0.0 governance for Swift AlgoChat",
+  "kind": "migration",
+  "state": "draft",
+  "base_commit": "7c00e26bc1f86e8c39e766376d37d864589c3c90",
+  "created_at": 1783884424,
+  "updated_at": 1783884433,
+  "affected_specs": [],
+  "affected_paths": [
+    ".github/",
+    ".specsync/",
+    ".trust.toml",
+    ".augur.toml",
+    ".attest.json",
+    "AGENTS.md",
+    "fledge.toml"
+  ],
+  "no_spec_change": true,
+  "no_spec_change_rationale": "This migration adds governance configuration and CI orchestration without changing the Swift protocol implementation; future meaningful implementation changes must add or update canonical specifications.",
+  "acceptance_criteria": [
+    "SpecSync advisory coverage passes; all four agent integrations are installed; Trust doctor passes; Swift build",
+    "the two CI-safe test batches",
+    "and the CLI smoke test pass; existing Linux",
+    "macOS",
+    "documentation",
+    "and release workflows remain green."
+  ],
+  "selected_artifacts": [
+    "context",
+    "research",
+    "design",
+    "plan",
+    "tasks",
+    "testing",
+    "docs"
+  ],
+  "dependencies": [],
+  "answers": {
+    "architecture_risk": "yes",
+    "public_contract": "no"
+  }
+}
