@@ -6,6 +6,13 @@
       "timestamp": 1783958439,
       "digest": "c71ecb64e29981c640bd094179570c126cdf87417ad30b3d715466c794cedddd",
       "note": "Definition approval after review of truthful completed preparation/configuration tasks and previously completed native verification; hosted CI and closing approval remain later gates."
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1783959195,
+      "digest": "28ba6c05a031d1527654b36f1ec946f18a27915218bcc177df50a19cdf8f0ed9",
+      "note": "Closing approval after committed-head Swift build, 68 storage tests, 155 CI-safe unit tests, and CLI help smoke passed; excluded localnet/crash-prone suites remain outside this governance-only change."
     }
   ]
 }

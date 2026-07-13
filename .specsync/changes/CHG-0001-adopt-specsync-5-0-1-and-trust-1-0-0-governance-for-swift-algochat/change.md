@@ -1,6 +1,6 @@
 ---
 id: CHG-0001-adopt-specsync-5-0-1-and-trust-1-0-0-governance-for-swift-algochat
-state: implementing
+state: accepted
 type: migration
 base_commit: 7c00e26bc1f86e8c39e766376d37d864589c3c90
 ---
