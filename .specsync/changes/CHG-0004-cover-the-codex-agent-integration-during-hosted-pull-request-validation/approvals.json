@@ -1,0 +1,18 @@
+{
+  "approvals": [
+    {
+      "gate": "definition",
+      "actor": "user:0xLeif",
+      "timestamp": 1784027317,
+      "digest": "30d6d1fdeb74cbb0ef7a3106fda9f3dfb4150a1812cb219c28366c2b0d6e91d4",
+      "note": "Portable definition approval authorized for rollout corrections; scope is the audited Codex integration path only"
+    },
+    {
+      "gate": "definition",
+      "actor": "user:0xLeif",
+      "timestamp": 1784027352,
+      "digest": "f3034599a5f1734066f95f6edaccd2c382ba7540a8d45f208c2f5f2f3ee269a6",
+      "note": "Refresh portable definition approval after adding explicit requirement-to-verification evidence"
+    }
+  ]
+}

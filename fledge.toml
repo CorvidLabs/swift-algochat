@@ -1,0 +1,9 @@
+[tasks]
+build = "swift build --target AlgoChat -v"
+test-crypto = "swift test --filter 'ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|KeyVerification'"
+test-unit = "swift test --filter 'ChatErrorTests|CustomAmountTests/|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|ConversationMergeTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|FileSendQueueStorageTests|ReplyContextModelTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|DiscoveredKeyTests|PSKRatchetTests|EnvelopeSecurity'"
+cli = "swift build --product algochat"
+
+[lanes.verify]
+description = "Build and run the CI-safe Swift test batches and CLI product build"
+steps = ["build", "test-crypto", "test-unit", "cli"]
