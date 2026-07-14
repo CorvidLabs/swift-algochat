@@ -51,7 +51,8 @@ Each canonical spec may have policy-selected companion files. Read and update th
 
 ## Before creating a PR
 
-Run `specsync check --strict` — all specs must pass with zero warnings.
+Run `specsync check --strict --require-coverage 100 --force` — all specs must pass with zero warnings
+and complete canonical source coverage.
 
 ## When adding new modules
 
