@@ -19,5 +19,5 @@ spec: algochat.spec.md
 ## Review Sign-offs
 
 - **Product contract**: represented by the implemented public API and reviewed canonical requirements
-- **Native verification**: 223 deterministic tests and CLI smoke test pass
+- **Native verification**: 237 deterministic tests and the CLI product build pass
 - **Governance**: portable definition and closing approvals are recorded through the SpecSync lifecycle

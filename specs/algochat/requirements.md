@@ -107,9 +107,9 @@ Key and PSK storage SHALL preserve private key confidentiality and durable state
 
 ### REQ-algochat-012
 
-Verification SHALL build the library and CLI, run the 68 cryptographic tests and 155 remaining unit tests, execute the CLI help smoke test, validate every governed source file and exported symbol at 100% SpecSync coverage, and make no semantic changes to `Sources/` or `Tests/` during this migration.
+Verification SHALL build the owned library target and CLI product, run the 68-test cryptographic batch and 169-test unit and envelope-security batch, validate every governed source file and exported symbol at 100% SpecSync coverage, and make no semantic changes to `Sources/` or `Tests/` during this migration.
 
 #### Acceptance Criteria
 
-- The Fledge lane passes 68 cryptographic tests, 155 other unit tests, and the CLI smoke test.
+- The Fledge lane passes 68 cryptographic tests, 169 other unit and envelope-security tests, and the noninteractive CLI product build.
 - SpecSync strict coverage and quality score are 100%, with no changes under `Sources/` or `Tests/`.

@@ -34,6 +34,20 @@
       "timestamp": 1784025924,
       "digest": "7c80d8537d5ca6f1a17449350de61ae6c5e26ba716b1f683f2dcbf90b14e3de8",
       "note": "Fresh closing approval after audited non-semantic canonical correction and successful native re-verification"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784026723,
+      "digest": "968d53868b57b70b84a94b5cbc0a8cff5fabc76c2599253932d6a32819d88582",
+      "note": "Fresh closing approval after accepted review corrections and 237-test verification"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784026800,
+      "digest": "1a44169d5eb6b09200f47e6321c5eb7d817916021aeb39e2a2dba368cd9999f4",
+      "note": "Final closing approval after canonical formatting correction and 237-test verification"
     }
   ],
   "reopenings": [
@@ -83,6 +97,100 @@
       },
       "stale_acceptance_input_digest": "42b87b9550189e897f4140596c5c24261211357cbb64c67c68b85e01397a41d3",
       "current_acceptance_input_digest": "814d258ccdd10effb087a52848bfc5b20e33d1ff43fce870c46116531b159d15"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage",
+      "actor": "user:0xLeif",
+      "reason": "Refresh full canonical coverage evidence after accepted review corrections expanded deterministic security coverage and updated requirement 012",
+      "timestamp": 1784026696,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784025924,
+        "digest": "7c80d8537d5ca6f1a17449350de61ae6c5e26ba716b1f683f2dcbf90b14e3de8",
+        "note": "Fresh closing approval after audited non-semantic canonical correction and successful native re-verification"
+      },
+      "prior_verification": {
+        "timestamp": 1784025917,
+        "commit": "5cafbfd630f1d3b61d69186b4470719e65a342ec",
+        "contract_digest": "3eaf1721317b130db84d1242ee6a3574b744c2c34502a4735004b60590cd2350",
+        "workspace_digest": "96c16e971a94f7d23027acc41337c3093ed0c239ba5b1e147a76f18e44652f9d",
+        "acceptance_input_digest": "814d258ccdd10effb087a52848bfc5b20e33d1ff43fce870c46116531b159d15",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-001",
+          "REQ-algochat-002",
+          "REQ-algochat-003",
+          "REQ-algochat-004",
+          "REQ-algochat-005",
+          "REQ-algochat-006",
+          "REQ-algochat-007",
+          "REQ-algochat-008",
+          "REQ-algochat-009",
+          "REQ-algochat-010",
+          "REQ-algochat-011",
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "814d258ccdd10effb087a52848bfc5b20e33d1ff43fce870c46116531b159d15",
+      "current_acceptance_input_digest": "2343a53a58483d45a1b8257b667737612cbddabff1723f9c33c14e6b0d272b6b"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage",
+      "actor": "user:0xLeif",
+      "reason": "Refresh complete canonical coverage evidence after final non-semantic canonical formatting correction",
+      "timestamp": 1784026786,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784026723,
+        "digest": "968d53868b57b70b84a94b5cbc0a8cff5fabc76c2599253932d6a32819d88582",
+        "note": "Fresh closing approval after accepted review corrections and 237-test verification"
+      },
+      "prior_verification": {
+        "timestamp": 1784026715,
+        "commit": "d1fd31da05d08891f28851567c35b51c32be5655",
+        "contract_digest": "3eaf1721317b130db84d1242ee6a3574b744c2c34502a4735004b60590cd2350",
+        "workspace_digest": "e3461adbc672ce1a577725290617aee2b304c461623832493405b7d32c3943df",
+        "acceptance_input_digest": "2343a53a58483d45a1b8257b667737612cbddabff1723f9c33c14e6b0d272b6b",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-001",
+          "REQ-algochat-002",
+          "REQ-algochat-003",
+          "REQ-algochat-004",
+          "REQ-algochat-005",
+          "REQ-algochat-006",
+          "REQ-algochat-007",
+          "REQ-algochat-008",
+          "REQ-algochat-009",
+          "REQ-algochat-010",
+          "REQ-algochat-011",
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "2343a53a58483d45a1b8257b667737612cbddabff1723f9c33c14e6b0d272b6b",
+      "current_acceptance_input_digest": "a71a4ae81182b6163c6427e388423ac40ed7d6f9e193061f4f93105076a64872"
     }
   ]
 }

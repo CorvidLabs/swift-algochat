@@ -1,6 +1,6 @@
 ---
 module: algochat
-version: 2
+version: 3
 status: active
 files:
   - Sources/AlgoChat/AlgoChat.swift
@@ -406,6 +406,7 @@ The contract includes every public declaration exported by the `AlgoChat` librar
 |------|--------|--------|
 | 2026-07-14 | 0xLeif | Establish complete canonical contract coverage for the implemented Swift package |
 | 2026-07-14 | SpecSync | Accepted CHG-0002 complete canonical Swift AlgoChat contract coverage |
+| 2026-07-14 | SpecSync | Accepted CHG-0003 non-semantic rollout review corrections |
 
 ## Purpose and Contract Coverage
 
