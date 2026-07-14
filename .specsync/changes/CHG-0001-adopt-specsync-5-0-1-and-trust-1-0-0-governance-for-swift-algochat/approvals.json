@@ -13,6 +13,63 @@
       "timestamp": 1783959195,
       "digest": "28ba6c05a031d1527654b36f1ec946f18a27915218bcc177df50a19cdf8f0ed9",
       "note": "Closing approval after committed-head Swift build, 68 storage tests, 155 CI-safe unit tests, and CLI help smoke passed; excluded localnet/crash-prone suites remain outside this governance-only change."
+    },
+    {
+      "gate": "definition",
+      "actor": "user:0xLeif",
+      "timestamp": 1784025987,
+      "digest": "8805937c578ba75f4c1a0e1411f373dd7adb6855b5c917bdc7e8f2a9bbe0bf90",
+      "note": "Re-approved refreshed governance-only evidence after complete canonical coverage was accepted"
+    },
+    {
+      "gate": "definition",
+      "actor": "user:0xLeif",
+      "timestamp": 1784026057,
+      "digest": "c71ecb64e29981c640bd094179570c126cdf87417ad30b3d715466c794cedddd",
+      "note": "Re-approved original immutable adoption definition for refreshed delivery evidence"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784026071,
+      "digest": "f3300c7a0c331a2234806521635deff9c4c450548d1970ade8d9d9203e97beee",
+      "note": "Fresh closing approval for original immutable adoption definition after current native verification passed"
+    }
+  ],
+  "reopenings": [
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0001-adopt-specsync-5-0-1-and-trust-1-0-0-governance-for-swift-algochat",
+      "actor": "user:0xLeif",
+      "reason": "Refresh original rollout evidence after adding the separately accepted complete canonical module contract and owned-target build configuration",
+      "timestamp": 1784025935,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1783959195,
+        "digest": "28ba6c05a031d1527654b36f1ec946f18a27915218bcc177df50a19cdf8f0ed9",
+        "note": "Closing approval after committed-head Swift build, 68 storage tests, 155 CI-safe unit tests, and CLI help smoke passed; excluded localnet/crash-prone suites remain outside this governance-only change."
+      },
+      "prior_verification": {
+        "timestamp": 1783959181,
+        "commit": "9dffe698917682b70b613cc26522d4332e426b76",
+        "contract_digest": "c71ecb64e29981c640bd094179570c126cdf87417ad30b3d715466c794cedddd",
+        "workspace_digest": "4f80964a9f05234bce160c7e2d9643b7aad61dba985a0dcb44aaebf978a37e03",
+        "acceptance_input_digest": "12f80585eaf9b6dac14597158b401d9d5c4d287c0bcc9a2f01849ef78188281d",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": []
+      },
+      "stale_acceptance_input_digest": "12f80585eaf9b6dac14597158b401d9d5c4d287c0bcc9a2f01849ef78188281d",
+      "current_acceptance_input_digest": "3b711eb2edf0830c380bed538bdc22f748abb9b88dfd7ca5eae75684ec5ed134"
     }
   ]
 }

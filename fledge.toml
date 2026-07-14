@@ -1,5 +1,5 @@
 [tasks]
-build = "swift build -v"
+build = "swift build --target AlgoChat -v"
 test-crypto = "swift test --filter 'ChatEnvelope|MessageEncryptor|KeyDerivation|KeyStorage|KeyVerification'"
 test-unit = "swift test --filter 'ChatErrorTests|CustomAmountTests/|MessageCodableTests|MessageDirectionTests|MessageEqualityTests|ConversationMergeTests|PendingMessageTests|SendQueueTests|InMemorySendQueueStorageTests|InMemoryMessageCacheTests|FileSendQueueStorageTests|ReplyContextModelTests|SyncManager|PSKEnvelopeTests|PSKExchangeURITests|PSKStateTests|PublicKeyCacheTests|DiscoveredKeyTests|PSKRatchetTests'"
 cli = "swift build --product algochat && .build/debug/algochat --help >/dev/null"

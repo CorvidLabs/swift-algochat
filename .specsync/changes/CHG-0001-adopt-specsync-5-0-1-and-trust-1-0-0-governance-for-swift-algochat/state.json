@@ -6,9 +6,10 @@
   "description": "Adopt SpecSync 5.0.1 and Trust 1.0.0 governance for Swift AlgoChat",
   "kind": "migration",
   "state": "accepted",
+  "canonical_applied": true,
   "base_commit": "7c00e26bc1f86e8c39e766376d37d864589c3c90",
   "created_at": 1783884424,
-  "updated_at": 1783959195,
+  "updated_at": 1784026071,
   "affected_specs": [],
   "affected_paths": [
     ".github/",
