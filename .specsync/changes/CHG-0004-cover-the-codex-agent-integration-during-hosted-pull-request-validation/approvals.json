@@ -13,6 +13,14 @@
       "timestamp": 1784027352,
       "digest": "f3034599a5f1734066f95f6edaccd2c382ba7540a8d45f208c2f5f2f3ee269a6",
       "note": "Refresh portable definition approval after adding explicit requirement-to-verification evidence"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784053479,
+      "digest": "f2f7eef221d868cd7880661715b0ff81be32f025b71e3640e220268914a9c642",
+      "note": "Closing approval after fresh native verification: 68 cryptographic tests, 169 unit tests, package build, CLI build, and explicit REQ-algochat-012 evidence passed"
     }
-  ]
+  ],
+  "reopenings": []
 }
