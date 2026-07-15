@@ -112,6 +112,5 @@ Verification SHALL build the owned library target and CLI product, run the 68-te
 #### Acceptance Criteria
 
 - The Fledge lane passes 68 cryptographic tests, 169 other unit and envelope-security tests, and the noninteractive CLI product build.
-- The Codex SpecSync skill invokes `specsync check --strict --require-coverage 100 --force` before a PR.
+- The Codex SpecSync skill invokes `specsync check --strict --require-coverage 100 --force` during PR validation.
 - SpecSync strict coverage and quality score are 100%, with no changes under `Sources/` or `Tests/`.
-

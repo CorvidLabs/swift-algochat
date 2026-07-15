@@ -1,6 +1,6 @@
 ---
 id: CHG-0004-cover-the-codex-agent-integration-during-hosted-pull-request-validation
-state: accepted
+state: verifying
 type: feature
 base_commit: 2944e0b39d7a14094f80003b6470be773ab89270
 ---

@@ -5,11 +5,11 @@
   "title": "Cover the Codex agent integration during hosted pull-request validation",
   "description": "Cover the Codex agent integration during hosted pull-request validation",
   "kind": "feature",
-  "state": "accepted",
+  "state": "verifying",
   "canonical_applied": true,
   "base_commit": "2944e0b39d7a14094f80003b6470be773ab89270",
   "created_at": 1784027213,
-  "updated_at": 1784053479,
+  "updated_at": 1784083973,
   "affected_specs": [
     "algochat"
   ],
