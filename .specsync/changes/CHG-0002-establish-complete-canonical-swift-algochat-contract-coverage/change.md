@@ -1,6 +1,6 @@
 ---
 id: CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage
-state: verifying
+state: accepted
 type: migration
 base_commit: 5cafbfd630f1d3b61d69186b4470719e65a342ec
 ---

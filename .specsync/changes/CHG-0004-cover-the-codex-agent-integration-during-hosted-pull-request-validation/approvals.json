@@ -20,6 +20,13 @@
       "timestamp": 1784053479,
       "digest": "f2f7eef221d868cd7880661715b0ff81be32f025b71e3640e220268914a9c642",
       "note": "Closing approval after fresh native verification: 68 cryptographic tests, 169 unit tests, package build, CLI build, and explicit REQ-algochat-012 evidence passed"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784084151,
+      "digest": "cf342710820b33c62bf5040037cbb6b767563506310648249cc2374efe623cd9",
+      "note": "Closing approval after clarifying during PR validation and fresh native verification: all 237 tests and the CLI build passed at 90d74e0"
     }
   ],
   "reopenings": [

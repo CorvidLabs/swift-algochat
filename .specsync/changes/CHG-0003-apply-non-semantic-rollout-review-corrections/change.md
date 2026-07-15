@@ -1,6 +1,6 @@
 ---
 id: CHG-0003-apply-non-semantic-rollout-review-corrections
-state: verifying
+state: accepted
 type: bug_fix
 base_commit: d1fd31da05d08891f28851567c35b51c32be5655
 ---
