@@ -20,6 +20,20 @@
       "timestamp": 1784026774,
       "digest": "fe53705847113315d4881b48fda256d18f9adc2a7bb30dd2855d141670f78dd6",
       "note": "Fresh closing approval after canonical formatting correction and 237-test verification"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784053545,
+      "digest": "d0644a1af2a09a15d8c3266d98404a57f0a1e6876d42814fb461640ed4531eee",
+      "note": "Fresh closing approval after audited reopen and successful 237-test native verification of REQ-algochat-012"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784084150,
+      "digest": "e3e09e22e556d5f74f41bfc19f01eb7772bd758fb0df1cc4681ade38fa53b0bc",
+      "note": "Closing approval after the non-semantic PR-validation wording correction and fresh native verification: all 237 tests and the CLI build passed at 90d74e0"
     }
   ],
   "reopenings": [
@@ -58,6 +72,78 @@
       },
       "stale_acceptance_input_digest": "8e53a1cf1276b58c2de040887b35e1f40eb6b107db3130d2eb37edb499ff0992",
       "current_acceptance_input_digest": "4943c4544b674be8e0b3d656cd784b0d2a3fa0b7b70717a6dc4d9f9e5a55c8d2"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0003-apply-non-semantic-rollout-review-corrections",
+      "actor": "user:0xLeif",
+      "reason": "CHG-0004 applied the approved Codex integration requirement to the shared canonical AlgoChat contract; refresh delivery evidence without replaying accepted semantic deltas",
+      "timestamp": 1784053501,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784026774,
+        "digest": "fe53705847113315d4881b48fda256d18f9adc2a7bb30dd2855d141670f78dd6",
+        "note": "Fresh closing approval after canonical formatting correction and 237-test verification"
+      },
+      "prior_verification": {
+        "timestamp": 1784026768,
+        "commit": "d1fd31da05d08891f28851567c35b51c32be5655",
+        "contract_digest": "d294b2ab14d93e8147792aeba6b8ebdbb73fb10f8a0bb98908925a31c23019cf",
+        "workspace_digest": "7f2558067c5e42be2f080c0021e010920df7a039f25b17294c5441f7f025152c",
+        "acceptance_input_digest": "4943c4544b674be8e0b3d656cd784b0d2a3fa0b7b70717a6dc4d9f9e5a55c8d2",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "4943c4544b674be8e0b3d656cd784b0d2a3fa0b7b70717a6dc4d9f9e5a55c8d2",
+      "current_acceptance_input_digest": "83cdc0f4bf18db0e9e676f8ed4489549356f7591178ae1f36b1d756eed221874"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0003-apply-non-semantic-rollout-review-corrections",
+      "actor": "user:0xLeif",
+      "reason": "REQ-algochat-012 canonical wording was clarified from before a PR to during PR validation; refresh delivery evidence for the shared accepted review-correction contract without changing the approved definition",
+      "timestamp": 1784084080,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784053545,
+        "digest": "d0644a1af2a09a15d8c3266d98404a57f0a1e6876d42814fb461640ed4531eee",
+        "note": "Fresh closing approval after audited reopen and successful 237-test native verification of REQ-algochat-012"
+      },
+      "prior_verification": {
+        "timestamp": 1784053539,
+        "commit": "7d27a1bb6d001a701c516dbfed9e484dfe9001ef",
+        "contract_digest": "d294b2ab14d93e8147792aeba6b8ebdbb73fb10f8a0bb98908925a31c23019cf",
+        "workspace_digest": "31211020678ba1572a4fc15951af3e68a33686e13acb7c0140c87c79a11d799a",
+        "acceptance_input_digest": "83cdc0f4bf18db0e9e676f8ed4489549356f7591178ae1f36b1d756eed221874",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "83cdc0f4bf18db0e9e676f8ed4489549356f7591178ae1f36b1d756eed221874",
+      "current_acceptance_input_digest": "701088e6a5445d5f8e7b00f46bd4ae15b948174931d4dc045636969fab6362a9"
     }
   ]
 }

@@ -13,6 +13,58 @@
       "timestamp": 1784027352,
       "digest": "f3034599a5f1734066f95f6edaccd2c382ba7540a8d45f208c2f5f2f3ee269a6",
       "note": "Refresh portable definition approval after adding explicit requirement-to-verification evidence"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784053479,
+      "digest": "f2f7eef221d868cd7880661715b0ff81be32f025b71e3640e220268914a9c642",
+      "note": "Closing approval after fresh native verification: 68 cryptographic tests, 169 unit tests, package build, CLI build, and explicit REQ-algochat-012 evidence passed"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784084151,
+      "digest": "cf342710820b33c62bf5040037cbb6b767563506310648249cc2374efe623cd9",
+      "note": "Closing approval after clarifying during PR validation and fresh native verification: all 237 tests and the CLI build passed at 90d74e0"
+    }
+  ],
+  "reopenings": [
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0004-cover-the-codex-agent-integration-during-hosted-pull-request-validation",
+      "actor": "user:0xLeif",
+      "reason": "Clarify the accepted REQ-algochat-012 timing from the ambiguous phrase before a PR to during PR validation, preserving the approved command and governance semantics",
+      "timestamp": 1784083973,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784053479,
+        "digest": "f2f7eef221d868cd7880661715b0ff81be32f025b71e3640e220268914a9c642",
+        "note": "Closing approval after fresh native verification: 68 cryptographic tests, 169 unit tests, package build, CLI build, and explicit REQ-algochat-012 evidence passed"
+      },
+      "prior_verification": {
+        "timestamp": 1784053468,
+        "commit": "7d27a1bb6d001a701c516dbfed9e484dfe9001ef",
+        "contract_digest": "f3034599a5f1734066f95f6edaccd2c382ba7540a8d45f208c2f5f2f3ee269a6",
+        "workspace_digest": "51c91acefc15a8346d5e248bf48121ac7813365595737188fec2df5a47bad9b9",
+        "acceptance_input_digest": "80fa18cd8fe7b1572151e11dc6e99617b549cfac52df469d97b207ed4b0c85f6",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "80fa18cd8fe7b1572151e11dc6e99617b549cfac52df469d97b207ed4b0c85f6",
+      "current_acceptance_input_digest": "6f1eea1a218c9b1854b0a5150372024e03d046c2ba22a4ff082a170645c02a99"
     }
   ]
 }

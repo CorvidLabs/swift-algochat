@@ -48,6 +48,20 @@
       "timestamp": 1784026800,
       "digest": "1a44169d5eb6b09200f47e6321c5eb7d817916021aeb39e2a2dba368cd9999f4",
       "note": "Final closing approval after canonical formatting correction and 237-test verification"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784053545,
+      "digest": "9dda7f1ae6cedcb28b707f7af0c82b86a3662bd067a7741b8ceef6dd69a64b46",
+      "note": "Fresh closing approval after audited reopen and successful 237-test native verification of all twelve canonical requirements"
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1784084150,
+      "digest": "6a76395d096d0428a2918c1a7a78603e05aaa67a076a113501a5b8f72e0b2d9c",
+      "note": "Closing approval after REQ-algochat-012 wording clarification and fresh native verification: 68 cryptographic tests, 169 unit and security tests, library build, and CLI build passed at 90d74e0"
     }
   ],
   "reopenings": [
@@ -191,6 +205,100 @@
       },
       "stale_acceptance_input_digest": "2343a53a58483d45a1b8257b667737612cbddabff1723f9c33c14e6b0d272b6b",
       "current_acceptance_input_digest": "a71a4ae81182b6163c6427e388423ac40ed7d6f9e193061f4f93105076a64872"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage",
+      "actor": "user:0xLeif",
+      "reason": "CHG-0004 applied the approved Codex integration requirement to the shared canonical AlgoChat contract; refresh delivery evidence without replaying accepted semantic deltas",
+      "timestamp": 1784053501,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784026800,
+        "digest": "1a44169d5eb6b09200f47e6321c5eb7d817916021aeb39e2a2dba368cd9999f4",
+        "note": "Final closing approval after canonical formatting correction and 237-test verification"
+      },
+      "prior_verification": {
+        "timestamp": 1784026793,
+        "commit": "d1fd31da05d08891f28851567c35b51c32be5655",
+        "contract_digest": "3eaf1721317b130db84d1242ee6a3574b744c2c34502a4735004b60590cd2350",
+        "workspace_digest": "7f2558067c5e42be2f080c0021e010920df7a039f25b17294c5441f7f025152c",
+        "acceptance_input_digest": "a71a4ae81182b6163c6427e388423ac40ed7d6f9e193061f4f93105076a64872",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-001",
+          "REQ-algochat-002",
+          "REQ-algochat-003",
+          "REQ-algochat-004",
+          "REQ-algochat-005",
+          "REQ-algochat-006",
+          "REQ-algochat-007",
+          "REQ-algochat-008",
+          "REQ-algochat-009",
+          "REQ-algochat-010",
+          "REQ-algochat-011",
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "a71a4ae81182b6163c6427e388423ac40ed7d6f9e193061f4f93105076a64872",
+      "current_acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage",
+      "actor": "user:0xLeif",
+      "reason": "REQ-algochat-012 canonical wording was clarified from before a PR to during PR validation; refresh delivery evidence for the shared accepted contract without changing the approved definition",
+      "timestamp": 1784084080,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784053545,
+        "digest": "9dda7f1ae6cedcb28b707f7af0c82b86a3662bd067a7741b8ceef6dd69a64b46",
+        "note": "Fresh closing approval after audited reopen and successful 237-test native verification of all twelve canonical requirements"
+      },
+      "prior_verification": {
+        "timestamp": 1784053520,
+        "commit": "7d27a1bb6d001a701c516dbfed9e484dfe9001ef",
+        "contract_digest": "3eaf1721317b130db84d1242ee6a3574b744c2c34502a4735004b60590cd2350",
+        "workspace_digest": "31211020678ba1572a4fc15951af3e68a33686e13acb7c0140c87c79a11d799a",
+        "acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-001",
+          "REQ-algochat-002",
+          "REQ-algochat-003",
+          "REQ-algochat-004",
+          "REQ-algochat-005",
+          "REQ-algochat-006",
+          "REQ-algochat-007",
+          "REQ-algochat-008",
+          "REQ-algochat-009",
+          "REQ-algochat-010",
+          "REQ-algochat-011",
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129",
+      "current_acceptance_input_digest": "2c8f0d88c465e2ebd64254f24515974408c773229ca439673da76962bfb512d1"
     }
   ]
 }
