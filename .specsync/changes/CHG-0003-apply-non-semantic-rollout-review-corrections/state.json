@@ -5,11 +5,11 @@
   "title": "Apply non-semantic rollout review corrections",
   "description": "Apply non-semantic rollout review corrections",
   "kind": "bug_fix",
-  "state": "accepted",
+  "state": "verifying",
   "canonical_applied": true,
   "base_commit": "d1fd31da05d08891f28851567c35b51c32be5655",
   "created_at": 1784026453,
-  "updated_at": 1784053545,
+  "updated_at": 1784084080,
   "affected_specs": [
     "algochat"
   ],

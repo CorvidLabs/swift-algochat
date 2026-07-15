@@ -245,6 +245,53 @@
       },
       "stale_acceptance_input_digest": "a71a4ae81182b6163c6427e388423ac40ed7d6f9e193061f4f93105076a64872",
       "current_acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "CHG-0002-establish-complete-canonical-swift-algochat-contract-coverage",
+      "actor": "user:0xLeif",
+      "reason": "REQ-algochat-012 canonical wording was clarified from before a PR to during PR validation; refresh delivery evidence for the shared accepted contract without changing the approved definition",
+      "timestamp": 1784084080,
+      "from_state": "accepted",
+      "to_state": "verifying",
+      "superseded_approval": {
+        "gate": "acceptance",
+        "actor": "user:0xLeif",
+        "timestamp": 1784053545,
+        "digest": "9dda7f1ae6cedcb28b707f7af0c82b86a3662bd067a7741b8ceef6dd69a64b46",
+        "note": "Fresh closing approval after audited reopen and successful 237-test native verification of all twelve canonical requirements"
+      },
+      "prior_verification": {
+        "timestamp": 1784053520,
+        "commit": "7d27a1bb6d001a701c516dbfed9e484dfe9001ef",
+        "contract_digest": "3eaf1721317b130db84d1242ee6a3574b744c2c34502a4735004b60590cd2350",
+        "workspace_digest": "31211020678ba1572a4fc15951af3e68a33686e13acb7c0140c87c79a11d799a",
+        "acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129",
+        "passed": true,
+        "commands": [
+          {
+            "command": "fledge lanes run verify",
+            "success": true,
+            "exit_code": 0
+          }
+        ],
+        "requirement_ids": [
+          "REQ-algochat-001",
+          "REQ-algochat-002",
+          "REQ-algochat-003",
+          "REQ-algochat-004",
+          "REQ-algochat-005",
+          "REQ-algochat-006",
+          "REQ-algochat-007",
+          "REQ-algochat-008",
+          "REQ-algochat-009",
+          "REQ-algochat-010",
+          "REQ-algochat-011",
+          "REQ-algochat-012"
+        ]
+      },
+      "stale_acceptance_input_digest": "21c65c16234ab2b3ee72316901082b735bb3a621c751c47cb2932550a6a7d129",
+      "current_acceptance_input_digest": "2c8f0d88c465e2ebd64254f24515974408c773229ca439673da76962bfb512d1"
     }
   ]
 }
