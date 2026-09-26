@@ -195,6 +195,22 @@ try await chat.send("Hello!", to: conversation, options: .confirmed)
 try await chat.send("Hello!", to: conversation, options: .indexed)
 ```
 
+## Architecture
+
+There is no AlgoChat server. The library encrypts on your device, carries the envelope in the note of an Algorand payment, and reads it back through an indexer.
+
+```mermaid
+flowchart LR
+    app["Your app or the algochat CLI"] --> lib["AlgoChat<br/>derive keys, encrypt, sign"]
+    lib -- "payment with encrypted note" --> algod["algod"]
+    algod --> ledger[("Algorand ledger")]
+    ledger --> indexer["Indexer"]
+    indexer -- "search transactions, decrypt" --> lib
+    lib <--> keys[("Keychain or ~/.algochat")]
+```
+
+The [high-level design](docs/HLD.md) covers the package targets, the protocol and wire formats, the send, receive, key-discovery and PSK flows as sequence diagrams, local storage, CI and releases, the trust model, and known limits.
+
 ## CLI Tool
 
 The package includes an interactive command-line interface:
