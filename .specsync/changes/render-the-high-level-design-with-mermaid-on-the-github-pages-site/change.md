@@ -1,6 +1,6 @@
 ---
 id: render-the-high-level-design-with-mermaid-on-the-github-pages-site
-state: draft
+state: accepted
 type: documentation
 base_commit: fba536f1b0ed4f240f14547262be1548b32650c9
 ---

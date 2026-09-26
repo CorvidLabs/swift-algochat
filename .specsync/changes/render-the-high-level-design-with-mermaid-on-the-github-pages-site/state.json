@@ -6,10 +6,11 @@
   "title": "Render the high-level design with Mermaid on the GitHub Pages site",
   "description": "Render the high-level design with Mermaid on the GitHub Pages site",
   "kind": "documentation",
-  "state": "draft",
+  "state": "accepted",
+  "canonical_applied": true,
   "base_commit": "fba536f1b0ed4f240f14547262be1548b32650c9",
   "created_at": 1790391516,
-  "updated_at": 1790391521,
+  "updated_at": 1790395542,
   "affected_specs": [],
   "affected_paths": [
     ".github/workflows/docs.yml",
