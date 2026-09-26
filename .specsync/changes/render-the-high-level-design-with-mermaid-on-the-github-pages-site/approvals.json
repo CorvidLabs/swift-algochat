@@ -1,0 +1,20 @@
+{
+  "approvals": [
+    {
+      "gate": "definition",
+      "actor": "user:0xLeif",
+      "timestamp": 1790395496,
+      "digest": "4508119e42a22921d5bdf213d47c84c777234a4b860a4243603415649d2b855a",
+      "note": "Approved by Leif in the orc session: \"i approve specsync changes\" (2026-09-26).",
+      "approved_delta_digests": {}
+    },
+    {
+      "gate": "acceptance",
+      "actor": "user:0xLeif",
+      "timestamp": 1790395542,
+      "digest": "0c47e0d0230e6270ae1bcff873008fbdc7bbb5d6d59cbc5fcb0f7828267bf854",
+      "note": "Accepted on Leif's instruction in the orc session: \"i approve specsync changes\" (2026-09-26)."
+    }
+  ],
+  "reopenings": []
+}

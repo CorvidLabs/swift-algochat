@@ -3,6 +3,9 @@
 .swiftpm/
 DerivedData/
 
+# Documentation site build output (docs.yml)
+_site/
+
 # Package resolution
 Package.resolved
 

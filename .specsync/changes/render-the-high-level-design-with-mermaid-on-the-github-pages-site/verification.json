@@ -1,0 +1,61 @@
+{
+  "timestamp": 1790395528,
+  "commit": "f8bb338c7f42b69456b08e3147f53c97ed349540",
+  "contract_digest": "4508119e42a22921d5bdf213d47c84c777234a4b860a4243603415649d2b855a",
+  "workspace_digest": "a892e4d64d852392aeeb83f4505a49582cd1e2fb0544a4a5be13d26eef6479da",
+  "acceptance_input_digest": "85b4e61f6b15b08244a3b6358b647206d7b332ed164ad238fcfcda0c8af9d1e0",
+  "acceptance_manifest": {
+    "schema_version": 1,
+    "entries": [
+      {
+        "path": ".github/workflows/docs.yml",
+        "kind": "file",
+        "mode": 33188,
+        "payload_digest": "07f1ff8caa4587146dc7fa8c634dde8366d48fb888daccd896759e93ff675f90",
+        "entry_digest": "75412a3a8c5eb42130c35cf02fe38a63195f39ca0619c773a4180dff955abbcf",
+        "owners": [
+          "@exact:delivery"
+        ]
+      },
+      {
+        "path": ".gitignore",
+        "kind": "file",
+        "mode": 33188,
+        "payload_digest": "b1901a8f1aaffae5656acc29fc0a8136c97b462e54402745a5372b525f4b8920",
+        "entry_digest": "e6457d077cdd0df27103a1ff88ba04b55a01377c107f674ce855f0d9e1d98e8e",
+        "owners": [
+          "@exact:delivery"
+        ]
+      },
+      {
+        "path": "docs/pages/architecture.html",
+        "kind": "file",
+        "mode": 33188,
+        "payload_digest": "865c67972bcc27122db0a23bc4055c0be5b4ed0800fea7bd7630213c08eccc34",
+        "entry_digest": "d36952ae750715ec8b123c30e6411f33b2ce73ffbdbdc2f29b9bce5d356535d1",
+        "owners": [
+          "@exact:delivery"
+        ]
+      },
+      {
+        "path": "docs/pages/build-architecture.ts",
+        "kind": "file",
+        "mode": 33188,
+        "payload_digest": "7226f7e1ffe24b576745451b855933a05ba0967d66db657d1973210eba43b124",
+        "entry_digest": "c9f5a1c8abba8addc7960266ba7b11ab245e15b7a981b3bf3db835818540765c",
+        "owners": [
+          "@exact:delivery"
+        ]
+      }
+    ]
+  },
+  "passed": true,
+  "commands": [
+    {
+      "command": "specsync check (no spec in scope)",
+      "success": true,
+      "exit_code": 0
+    }
+  ],
+  "requirement_ids": []
+}
