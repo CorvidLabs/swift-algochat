@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "workflow_origin_version": 1,
+  "id": "render-the-high-level-design-with-mermaid-on-the-github-pages-site",
+  "slug": "render-the-high-level-design-with-mermaid-on-the-github-pages-site",
+  "title": "Render the high-level design with Mermaid on the GitHub Pages site",
+  "description": "Render the high-level design with Mermaid on the GitHub Pages site",
+  "kind": "documentation",
+  "state": "draft",
+  "base_commit": "fba536f1b0ed4f240f14547262be1548b32650c9",
+  "created_at": 1790391516,
+  "updated_at": 1790391521,
+  "affected_specs": [],
+  "affected_paths": [
+    ".github/workflows/docs.yml",
+    "docs/pages/",
+    ".gitignore"
+  ],
+  "no_spec_change": true,
+  "no_spec_change_rationale": "Documentation publishing only; the AlgoChat library, CLI and canonical contract are unchanged",
+  "acceptance_criteria": [
+    "The docs workflow publishes docs/HLD.md at /architecture/ on the GitHub Pages site with every Mermaid diagram rendered, keeps the DocC API reference at /documentation/algochat/, and changes nothing under Sources/, Tests/ or Package.swift"
+  ],
+  "selected_artifacts": [
+    "context",
+    "docs"
+  ],
+  "dependencies": [],
+  "answers": {
+    "architecture_risk": "no",
+    "public_contract": "no"
+  }
+}
