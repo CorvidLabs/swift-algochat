@@ -519,7 +519,7 @@ struct AlgoChatCLI {
             style: .dots
         ) {
             if isLocalnet {
-                let config = AlgorandConfiguration(
+                let config = try AlgorandConfiguration(
                     network: .localnet,
                     apiToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 )
