@@ -79,7 +79,7 @@ public actor AlgoChat {
         publicKeyCache: PublicKeyCache? = nil,
         pskStorage: (any PSKStorage)? = nil
     ) async throws {
-        self.algokit = AlgoKit(network: network)
+        self.algokit = try AlgoKit(network: network)
         self.account = try ChatAccount(account: account)
         self.messageCache = messageCache
         self.publicKeyCache = publicKeyCache ?? PublicKeyCache()

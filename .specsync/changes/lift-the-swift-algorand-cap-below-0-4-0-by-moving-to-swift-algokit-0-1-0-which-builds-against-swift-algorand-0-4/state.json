@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "workflow_origin_version": 1,
+  "id": "lift-the-swift-algorand-cap-below-0-4-0-by-moving-to-swift-algokit-0-1-0-which-builds-against-swift-algorand-0-4",
+  "slug": "lift-the-swift-algorand-cap-below-0-4-0-by-moving-to-swift-algokit-0-1-0-which-builds-against-swift-algorand-0-4",
+  "title": "Lift the swift-algorand cap below 0.4.0 by moving to swift-algokit 0.1.0, which builds against swift-algorand 0.4",
+  "description": "Lift the swift-algorand cap below 0.4.0 by moving to swift-algokit 0.1.0, which builds against swift-algorand 0.4",
+  "kind": "bug_fix",
+  "state": "draft",
+  "base_commit": "5aa7214e241a6a3fb7215960efa2ffac46ddeae0",
+  "created_at": 1790809131,
+  "updated_at": 1790809137,
+  "affected_specs": [
+    "algochat"
+  ],
+  "affected_paths": [
+    "Package.swift",
+    "Sources/AlgoChat/AlgoChat.swift",
+    "Sources/AlgoChatCLI/AlgoChatCLI.swift",
+    "Tests/AlgoChatTests"
+  ],
+  "no_spec_change": true,
+  "no_spec_change_rationale": "AlgoChat's public API is unchanged: its initializers already throw, and only dependency bounds and internal try expressions change.",
+  "acceptance_criteria": [
+    "swift-algochat resolves and builds against swift-algorand 0.4 through swift-algokit 0.1.0; the non-localnet test suite passes; AlgoChat's public API is unchanged."
+  ],
+  "selected_artifacts": [
+    "context",
+    "testing",
+    "tasks"
+  ],
+  "dependencies": [],
+  "answers": {
+    "architecture_risk": "no",
+    "public_contract": "no"
+  }
+}
