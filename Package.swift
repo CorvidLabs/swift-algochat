@@ -55,7 +55,7 @@ let package = Package(
     ],
     products: products,
     dependencies: [
-        .package(url: "https://github.com/CorvidLabs/swift-algokit.git", branch: "fix/swift-algorand-0.4"),
+        .package(url: "https://github.com/CorvidLabs/swift-algokit.git", from: "0.1.0"),
         .package(url: "https://github.com/CorvidLabs/swift-algorand.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/CorvidLabs/swift-cli.git", from: "0.1.0"),

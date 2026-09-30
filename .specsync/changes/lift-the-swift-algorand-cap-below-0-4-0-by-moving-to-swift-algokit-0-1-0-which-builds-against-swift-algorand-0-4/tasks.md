@@ -7,5 +7,5 @@ artifact: tasks
 
 - [x] Drop the swift-algorand cap; depend on the swift-algokit fix
 - [x] `try` on `AlgoKit(network:)`, the CLI's `AlgorandConfiguration`, and the tests' `.localnet()`
-- [ ] Switch to swift-algokit `from: "0.1.0"` once it is tagged
+- [x] Switch to swift-algokit `from: "0.1.0"` (released at 2502d3a)
 - [ ] Definition approval (Leif), check, accept, archive; release afterwards (Leif's go)
