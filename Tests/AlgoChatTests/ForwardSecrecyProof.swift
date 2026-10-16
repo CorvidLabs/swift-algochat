@@ -310,7 +310,7 @@ struct ForwardSecrecyProof {
         print("  [126...]  Ciphertext+Tag:     \(Data(encoded[126...]).prefix(8).hexString)... (\(encoded.count - 126) bytes)")
         print("\nTotal envelope size: \(encoded.count) bytes")
         print("Header overhead: \(ChatEnvelope.headerSize) bytes")
-        print("Max payload (1024 - \(ChatEnvelope.headerSize) - 16): \(ChatEnvelope.maxPayloadSize) bytes")
+        print("Max payload (\(ChatEnvelope.maxNoteSize) - \(ChatEnvelope.headerSize) - 16): \(ChatEnvelope.maxPayloadSize) bytes")
 
         // Verify structure
         #expect(encoded[0] == 0x01, "Version must be 0x01")

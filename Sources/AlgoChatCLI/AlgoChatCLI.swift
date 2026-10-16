@@ -9,7 +9,7 @@ struct AlgoChatCLI {
     // MARK: - Constants
 
     /// Maximum message size in bytes (transaction note limit minus envelope overhead)
-    static let maxMessageBytes = 962
+    private static let maxMessageBytes = ChatEnvelope.maxPayloadSize
 
     /// Standard address display length
     static let addressDisplayLength = 12

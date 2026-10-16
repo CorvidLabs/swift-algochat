@@ -160,7 +160,7 @@ Messages are encrypted using modern cryptographic primitives:
 ```
 
 - **Header size**: 126 bytes
-- **Maximum message**: 882 bytes (after encryption overhead)
+- **Maximum message**: 3954 bytes (after encryption overhead)
 
 **PSK Ratcheting Mode** (protocol `0x02`):
 
@@ -169,7 +169,7 @@ Messages are encrypted using modern cryptographic primitives:
 ```
 
 - **Header size**: 130 bytes
-- **Maximum message**: 878 bytes (after encryption overhead)
+- **Maximum message**: 3950 bytes (after encryption overhead)
 
 ### Key Storage
 

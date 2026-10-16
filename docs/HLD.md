@@ -223,7 +223,9 @@ then still hands the plain `Account` to `AlgoChat`.
 ## 4. Protocol
 
 swift-algochat implements the two wire formats of protocol 1.1: standard mode (protocol byte `0x01`) and ratcheting
-PSK mode (`0x02`). Protocol 1.2's optional Falcon-1024 account authorization has no code in this repository.
+PSK mode (`0x02`). Protocol revision 1.2.1 raises the note ceiling to 4,096 bytes and prices each byte past 1,024.
+It does not add a version byte. Protocol 1.2's optional Falcon-1024 account authorization has no code in this
+repository. This change is not protocol 1.3.
 
 ### 4.1 Identity and key derivation
 
@@ -266,9 +268,10 @@ PSK envelope, [`PSKEnvelope.swift`](../Sources/AlgoChat/Models/PSKEnvelope.swift
 | 82 | 48 | encrypted sender key |
 | 130 | n + 16 | ciphertext plus tag |
 
-An Algorand note holds at most 1,024 bytes, so the largest plaintext is 1024 - 126 - 16 = **882 bytes** in standard
-mode and 1024 - 130 - 16 = **878 bytes** in PSK mode (`maxPayloadSize`). `MessageTransaction` also refuses any
-encoded note over 1,024 bytes.
+An Algorand note holds at most 4,096 bytes, so the largest plaintext is 4096 - 126 - 16 = **3954 bytes** in standard
+mode and 4096 - 130 - 16 = **3950 bytes** in PSK mode (`maxPayloadSize`). A plaintext of 882 bytes (standard) or 878
+bytes (PSK) still encodes, and that note is 1,024 bytes. `MessageTransaction` refuses any encoded note over 4,096
+bytes before a transaction is submitted.
 
 Decoding ([`EnvelopeDecoder.swift`](../Sources/AlgoChat/Models/EnvelopeDecoder.swift)): a note counts as AlgoChat
 when byte 0 is `0x01` and byte 1 is `0x01` or `0x02`. The protocol byte picks the envelope type; the decoder then
@@ -372,7 +375,7 @@ sequenceDiagram
     participant Indexer
 
     App->>Chat: send(text, to conversation, options)
-    Chat->>Chat: reject if UTF-8 text is over 882 bytes
+    Chat->>Chat: reject if UTF-8 text is over the standard maximum (3954 bytes)
     Chat->>Algod: accountInformation(own address)
     Algod-->>Chat: balance
     Note over Chat: insufficientBalance below 101,000 microAlgos
@@ -412,8 +415,10 @@ Notes, all from [`AlgoChat.swift`](../Sources/AlgoChat/AlgoChat.swift) and
 
 - The payment amount defaults to `MessageTransaction.minimumPayment` (1,000 microAlgos) and can be overridden with
   `SendOptions.amount`. The suggested parameters supply the validity window (first valid round plus 1,000) and the
-  genesis ID and hash. The fee is the flat 1,000 microAlgos default of swift-algorand's `PaymentTransactionBuilder`
-  (resolved version 0.3.2); the code does not set it from the suggested parameters.
+  genesis ID and hash. The fee is the consensus note fee from `params.minFee`: the first 1,024 bytes cost one
+  minimum fee, and each byte past that adds one ten-thousandth of the minimum fee, rounded up once. At a minimum
+  fee of 1,000, 1,024 bytes cost 1,000, 2,000 bytes cost 1,098, and 4,096 bytes cost 1,308. Signing is Ed25519, so
+  no Falcon minimum fees are added.
 - `.default` returns right after submission, `.confirmed` waits for algod, `.indexed` waits for algod and then the
   indexer. `.replying(to:)` and `.withAmount(_:)` build the other variants.
 - The returned `Message` is optimistic: its timestamp is the local clock and its `confirmedRound` is 0 unless the
@@ -584,7 +589,7 @@ Every AlgoChat record is an Algorand payment transaction ([`MessageTransaction.s
 | receiver | the recipient's address | the publisher's own address |
 | amount | 1,000 microAlgos by default, or `SendOptions.amount` | 0 |
 | note | standard or PSK envelope | standard envelope, then a 64-byte Ed25519 signature |
-| fee | 1,000 microAlgos, the swift-algorand builder default | same |
+| fee | consensus note fee from `minFee` (1,000 at 1,024 bytes or less when `minFee` is 1,000; 1,308 at 4,096 bytes) | same formula on the signed note |
 | validity | first valid round from algod's suggested parameters, plus 1,000 rounds | same |
 
 The indexer adds the txid (used as `Message.id`), the confirmed round and the round time (used as
@@ -771,7 +776,7 @@ Secrets handling:
 | Situation | Behavior | Source |
 |---|---|---|
 | No indexer in the configuration | `AlgoChat.init` throws `indexerNotConfigured` | `AlgoChat.swift` |
-| Text too long | `messageTooLarge(maxSize: 882)` standard, `878` PSK; reply JSON counts toward the limit | `AlgoChat.swift`, `MessageEncryptor.swift` |
+| Text too long | `messageTooLarge(maxSize: 3954)` standard, `3950` PSK; reply JSON counts toward the limit | `AlgoChat.swift`, `MessageEncryptor.swift` |
 | Balance below 101,000 microAlgos | `insufficientBalance` before any network write. The check ignores a custom `amount`, so a larger payment can still be rejected by algod | `AlgoChat.swift` |
 | Recipient has never sent an AlgoChat transaction or published a key | `publicKeyNotFound` from `send`; `conversation(with:)` returns a conversation without a key instead of throwing | `AlgoChat.swift`, `MessageIndexer.swift` |
 | Busy address during key discovery | Exhaustive paging by default, 50 per page, one indexer call per page; `maxPages` bounds it | `MessageIndexer.findPublicKey` |
@@ -787,7 +792,7 @@ Secrets handling:
 | `SyncManager.setOnline(true)`, `syncIfNeeded()`, `retry(_:)` | These call `sync(using: nil)`, which returns without sending. Queued messages go out only when the app calls `sync(using:)` with a client | `SyncManager.swift` |
 | Keychain on tvOS, watchOS, Linux | In-memory fallback; keys do not survive a restart | `KeychainKeyStorage.swift` |
 | Wrong password or corrupt key file | `KeyStorageError.decryptionFailed` or `invalidKeyData`; no key is returned | `FileKeyStorage.swift` |
-| Network asks for more than the minimum fee | The fee stays at the builder's flat 1,000 microAlgos; nothing raises it, so algod may reject the transaction | `MessageTransaction.swift` |
+| Note longer than 1,024 bytes | The fee rises with the note. The local balance check still uses a flat 1,000 microAlgo fee plus the 100,000 minimum balance, and it ignores a custom amount, so a nearly empty account can pass the check and still be rejected by algod | `AlgoChat.swift`, `MessageTransaction.swift` |
 | Rate limits on public endpoints | **Unknown.** No rate-limit handling or retry exists for algod or indexer calls, apart from the indexer-visibility poll | none |
 
 ## 10. Decisions
@@ -826,8 +831,6 @@ Found while writing this document. The code is described above as it is; these a
 - [README](../README.md) shows `FilePSKStorage(directory: ".algochat")` and
   `FileKeyStorage(directory: ".algochat", password: "secret")`. The initializers are
   `FilePSKStorage(directoryName:)` and `FileKeyStorage(password:)`.
-- The `AlgoChat.send` doc comment says "max ~962 bytes" and the CLI's `maxMessageBytes` is 962. The enforced limit
-  is 882 bytes (878 in PSK mode).
 - README and [SECURITY.md](../SECURITY.md) describe forward secrecy for past messages. The code, and protocol section
   11.1, give per-message key separation without forward secrecy (section 8).
 - SECURITY.md says the key-derivation salt is derived from the account address and uses the `"AlgoChatV1"` label.
@@ -845,7 +848,7 @@ Found while writing this document. The code is described above as it is; these a
 | algod | The Algorand node REST API: suggested parameters, submission, confirmation, account state |
 | Indexer | The Algorand indexer REST API: searchable transaction history |
 | Round | An Algorand block; `confirmedRound` is the block a transaction landed in |
-| Note | The up to 1,024-byte free-form field of an Algorand transaction; AlgoChat puts its envelope there |
+| Note | The up to 4,096-byte free-form field of an Algorand transaction; AlgoChat puts its envelope there |
 | microAlgo | One millionth of an ALGO; fees and amounts are in microAlgos |
 | Envelope | The binary AlgoChat record in a note: header, keys, nonce, wrapped key, ciphertext |
 | Standard mode | Protocol `0x01`: X25519 ephemeral agreement with ChaCha20-Poly1305 |

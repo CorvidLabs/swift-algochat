@@ -7,8 +7,8 @@ spec: algochat.spec.md
 | Verification | Type | Contract Evidence |
 |--------------|------|-------------------|
 | `swift build -v` | Package build | REQ-algochat-001, REQ-algochat-012 |
-| `swift test --filter Crypto` through the Fledge crypto task | Deterministic unit tests (68 tests, 13 suites) | REQ-algochat-002, REQ-algochat-003, REQ-algochat-006, REQ-algochat-007, REQ-algochat-008, REQ-algochat-011 |
-| Remaining unit and envelope-security batch through the Fledge unit task | Deterministic tests (169 tests, 22 suites) | REQ-algochat-002, REQ-algochat-003, REQ-algochat-004, REQ-algochat-005, REQ-algochat-007, REQ-algochat-009, REQ-algochat-010, REQ-algochat-011 |
+| `swift test --filter Crypto` through the Fledge crypto task | Deterministic unit tests (70 tests, 13 suites) | REQ-algochat-002, REQ-algochat-003, REQ-algochat-006, REQ-algochat-007, REQ-algochat-008, REQ-algochat-011 |
+| Remaining unit and envelope-security batch through the Fledge unit task | Deterministic tests (172 tests, 22 suites) | REQ-algochat-002, REQ-algochat-003, REQ-algochat-004, REQ-algochat-005, REQ-algochat-007, REQ-algochat-009, REQ-algochat-010, REQ-algochat-011 |
 | `swift build --product algochat` | Executable product build | REQ-algochat-001, REQ-algochat-012 |
 | `specsync check --strict --require-coverage 100 --force` | Contract coverage | REQ-algochat-012 |
 | `fledge trust doctor` and `fledge trust verify` | Unified governance gate | REQ-algochat-012 |

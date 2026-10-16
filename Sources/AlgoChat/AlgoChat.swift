@@ -79,7 +79,7 @@ public actor AlgoChat {
         publicKeyCache: PublicKeyCache? = nil,
         pskStorage: (any PSKStorage)? = nil
     ) async throws {
-        self.algokit = AlgoKit(network: network)
+        self.algokit = try AlgoKit(network: network)
         self.account = try ChatAccount(account: account)
         self.messageCache = messageCache
         self.publicKeyCache = publicKeyCache ?? PublicKeyCache()
@@ -285,7 +285,7 @@ public actor AlgoChat {
      confirmation waiting and reply context.
 
      - Parameters:
-       - message: The plaintext message (max ~962 bytes when UTF-8 encoded)
+       - message: The plaintext message (at most `ChatEnvelope.maxPayloadSize` UTF-8 bytes)
        - conversation: The conversation to send to
        - options: Send options (default: fire-and-forget)
      - Returns: SendResult containing the transaction ID and sent message
@@ -670,7 +670,7 @@ public actor AlgoChat {
      use hybrid PSK + ephemeral ECDH for enhanced security.
 
      - Parameters:
-       - message: The plaintext message (max ~878 bytes when UTF-8 encoded)
+       - message: The plaintext message (at most `PSKEnvelope.maxPayloadSize` UTF-8 bytes)
        - conversation: The conversation to send to
        - options: Send options (default: fire-and-forget)
      - Returns: SendResult containing the transaction ID and sent message

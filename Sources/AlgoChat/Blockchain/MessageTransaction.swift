@@ -7,6 +7,24 @@ public enum MessageTransaction {
     /// Minimum payment amount for a message (0.001 ALGO)
     public static let minimumPayment = MicroAlgos(1000)
 
+    /// Note bytes covered by one minimum fee.
+    /// Each byte past this adds one ten-thousandth of the minimum fee, rounded up once.
+    private static let noteFeeIncludedBytes = 1_024
+
+    /**
+     Fee in microAlgos for a note of `noteBytes` at the network minimum fee.
+
+     The first 1,024 bytes cost one minimum fee. Each later byte adds one
+     ten-thousandth of that minimum fee, rounded up once. This package signs
+     with Ed25519, so the scheme component is one minimum fee. Falcon-1024
+     authorization is not implemented; it would add two further minimum fees.
+     */
+    public static func fee(noteBytes: Int, minFee: UInt64) -> UInt64 {
+        let over = noteBytes > noteFeeIncludedBytes ? noteBytes - noteFeeIncludedBytes : 0
+        let surcharge = (UInt64(over) * minFee + 9_999) / 10_000
+        return minFee + surcharge
+    }
+
     /**
      Creates a payment transaction carrying an encrypted message
 
@@ -25,19 +43,13 @@ public enum MessageTransaction {
         params: TransactionParams,
         amount: MicroAlgos = minimumPayment
     ) throws -> PaymentTransaction {
-        let noteData = envelope.encode()
-
-        guard noteData.count <= 1024 else {
-            throw ChatError.messageTooLarge(maxSize: 1024)
-        }
-
-        return try PaymentTransactionBuilder()
-            .sender(sender.address)
-            .receiver(recipient)
-            .amount(amount)
-            .note(noteData)
-            .params(params)
-            .build()
+        try makePayment(
+            sender: sender.address,
+            receiver: recipient,
+            amount: amount,
+            note: envelope.encode(),
+            params: params
+        )
     }
 
     /// Creates and signs a message transaction
@@ -81,17 +93,13 @@ public enum MessageTransaction {
         var noteData = envelope.encode()
         noteData.append(keySignature)
 
-        guard noteData.count <= 1024 else {
-            throw ChatError.messageTooLarge(maxSize: 1024)
-        }
-
-        let tx = try PaymentTransactionBuilder()
-            .sender(sender.address)
-            .receiver(sender.address)
-            .amount(MicroAlgos(0))
-            .note(noteData)
-            .params(params)
-            .build()
+        let tx = try makePayment(
+            sender: sender.address,
+            receiver: sender.address,
+            amount: MicroAlgos(0),
+            note: noteData,
+            params: params
+        )
 
         return try SignedTransaction.sign(tx, with: sender.account)
     }
@@ -116,17 +124,36 @@ public enum MessageTransaction {
         params: TransactionParams,
         amount: MicroAlgos = minimumPayment
     ) throws -> PaymentTransaction {
-        let noteData = envelope.encode()
+        try makePayment(
+            sender: sender.address,
+            receiver: recipient,
+            amount: amount,
+            note: envelope.encode(),
+            params: params
+        )
+    }
 
-        guard noteData.count <= 1024 else {
-            throw ChatError.messageTooLarge(maxSize: 1024)
+    // MARK: - Private Methods
+
+    /// Builds a payment whose fee is the consensus note fee for `note`.
+    private static func makePayment(
+        sender: Address,
+        receiver: Address,
+        amount: MicroAlgos,
+        note: Data,
+        params: TransactionParams
+    ) throws -> PaymentTransaction {
+        guard note.count <= ChatEnvelope.maxNoteSize else {
+            throw ChatError.messageTooLarge(maxSize: ChatEnvelope.maxNoteSize)
         }
 
+        let noteFee = MicroAlgos(fee(noteBytes: note.count, minFee: params.minFee))
         return try PaymentTransactionBuilder()
-            .sender(sender.address)
-            .receiver(recipient)
+            .sender(sender)
+            .receiver(receiver)
             .amount(amount)
-            .note(noteData)
+            .fee(noteFee)
+            .note(note)
             .params(params)
             .build()
     }

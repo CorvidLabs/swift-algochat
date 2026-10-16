@@ -38,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release.
 - PBKDF2-HMAC-SHA256 known-answer test vectors.
 
+## [0.4.0] - 2026-10-16
+
+### Changed
+- **4096-byte notes** - An AlgoChat note may be 4096 bytes (protocol revision
+  1.2.1). Standard plaintext maximum is 3954 bytes and PSK plaintext maximum
+  is 3950 bytes. Envelope layout is unchanged. The first 1024 bytes still
+  cost one minimum fee. Each byte past 1024 adds one ten-thousandth of the
+  minimum fee, rounded up once. At a minimum fee of 1000 microAlgos, 1024
+  bytes cost 1000, 2000 bytes cost 1098, and 4096 bytes cost 1308.
+
+### Fixed
+- `AlgoChat.init(network:)` propagates the error from swift-algokit's throwing
+  network initializer.
+
 ## [0.3.0] - 2026-01-27
 
 ### Added
