@@ -97,6 +97,7 @@ The contract includes every public declaration exported by the `AlgoChat` librar
 | `extractKey` |
 | `MessageTransaction` |
 | `minimumPayment` |
+| `fee` |
 | `create` |
 | `createSigned` |
 | `createSignedKeyPublish` |
@@ -158,6 +159,7 @@ The contract includes every public declaration exported by the `AlgoChat` librar
 | `headerSize` |
 | `encryptedSenderKeySize` |
 | `tagSize` |
+| `maxNoteSize` |
 | `maxPayloadSize` |
 | `senderPublicKey` |
 | `ephemeralPublicKey` |
@@ -341,10 +343,10 @@ The contract includes every public declaration exported by the `AlgoChat` librar
 
 ## Invariants
 
-1. Standard envelopes use version `0x01`, protocol `0x01`, a 126-byte header, and a 1,024-byte transaction-note ceiling; PSK envelopes use protocol `0x02` and a 130-byte header.
+1. Standard envelopes use version `0x01`, protocol `0x01`, a 126-byte header, and a 4,096-byte transaction-note ceiling; PSK envelopes use protocol `0x02` and a 130-byte header. A maximum plaintext encodes to exactly 4,096 bytes.
 2. Standard encryption combines a fresh X25519 ephemeral key, HKDF-SHA256 domain separation, and ChaCha20-Poly1305; sender-key wrapping permits both participants to decrypt the stored message.
 3. PSK mode combines the ratcheted 32-byte pre-shared key with ephemeral ECDH, rejects replayed or out-of-window counters, and records a receive counter only after successful decryption.
-4. On-chain message and key-publication transactions use the configured payment amount, never exceeding the Algorand note limit; the default amount is 1,000 microAlgos.
+4. On-chain message and key-publication transactions use the configured payment amount, never exceeding the 4,096-byte note limit; the default amount is 1,000 microAlgos. The fee is one minimum fee plus the rounded note surcharge for bytes past 1,024. Ed25519 does not add Falcon fees.
 5. Queue, cache, storage, and client state exposed across concurrency boundaries remain actor-isolated or `Sendable`.
 6. Key-publish payloads are discovery metadata and are not returned as chat messages.
 7. Reply metadata preserves the original transaction identifier and limits its preview to 80 characters while remaining backward-compatible with plain-text payloads.
@@ -404,6 +406,7 @@ The contract includes every public declaration exported by the `AlgoChat` librar
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-10-16 | 0xLeif | Raise the note ceiling to 4,096 bytes (protocol revision 1.2.1) and price the consensus note fee |
 | 2026-07-14 | 0xLeif | Establish complete canonical contract coverage for the implemented Swift package |
 | 2026-07-14 | SpecSync | Accepted CHG-0002 complete canonical Swift AlgoChat contract coverage |
 | 2026-07-14 | SpecSync | Accepted CHG-0003 non-semantic rollout review corrections |

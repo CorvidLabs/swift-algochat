@@ -12,7 +12,8 @@ import Foundation
  - Nonce: 12 bytes (ChaCha20-Poly1305)
  - Encrypted Sender Key: 48 bytes (symmetric key encrypted for sender + tag)
  - Ciphertext + Tag: remaining bytes
- - Overhead: 146 bytes (130-byte header + 16-byte tag), max message: 878 bytes
+ - Overhead: 146 bytes (130-byte header + 16-byte tag)
+ - Maximum plaintext is the shared note ceiling minus the header and tag
  */
 public struct PSKEnvelope: Sendable {
     // MARK: - Constants
@@ -32,8 +33,8 @@ public struct PSKEnvelope: Sendable {
     /// Size of the Poly1305 authentication tag
     public static let tagSize = 16
 
-    /// Maximum size of the encrypted payload
-    public static let maxPayloadSize = 1024 - headerSize - tagSize  // 878 bytes
+    /// Maximum size of the plaintext payload
+    public static let maxPayloadSize = ChatEnvelope.maxNoteSize - headerSize - tagSize
 
     // MARK: - Properties
 

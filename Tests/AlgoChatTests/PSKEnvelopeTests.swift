@@ -112,9 +112,47 @@ struct PSKEnvelopeTests {
 
     // MARK: - Max Payload
 
-    @Test("Max payload size is 878 bytes")
+    @Test("Max payload size is 3950 bytes")
     func testMaxPayloadSize() {
-        #expect(PSKEnvelope.maxPayloadSize == 878)
+        #expect(PSKEnvelope.maxPayloadSize == 3950)
+    }
+
+    @Test("An 878-byte plaintext still encodes, and the maximum encodes to 4096")
+    func testLegacyAndMaximumPlaintext() throws {
+        let sender = Curve25519.KeyAgreement.PrivateKey()
+        let recipient = Curve25519.KeyAgreement.PrivateKey()
+        let currentPSK = PSKRatchet.derivePSKAtCounter(
+            initialPSK: Data(repeating: 0xAA, count: 32),
+            counter: 0
+        )
+
+        let legacy = try MessageEncryptor.encryptPSK(
+            message: String(repeating: "A", count: 878),
+            senderPrivateKey: sender,
+            recipientPublicKey: recipient.publicKey,
+            currentPSK: currentPSK,
+            ratchetCounter: 0
+        )
+        #expect(legacy.encode().count == 1024)
+
+        let maximum = try MessageEncryptor.encryptPSK(
+            message: String(repeating: "B", count: PSKEnvelope.maxPayloadSize),
+            senderPrivateKey: sender,
+            recipientPublicKey: recipient.publicKey,
+            currentPSK: currentPSK,
+            ratchetCounter: 1
+        )
+        #expect(maximum.encode().count == 4096)
+
+        #expect(throws: ChatError.self) {
+            _ = try MessageEncryptor.encryptPSK(
+                message: String(repeating: "C", count: PSKEnvelope.maxPayloadSize + 1),
+                senderPrivateKey: sender,
+                recipientPublicKey: recipient.publicKey,
+                currentPSK: currentPSK,
+                ratchetCounter: 2
+            )
+        }
     }
 
     // MARK: - Validation

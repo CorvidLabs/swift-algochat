@@ -150,8 +150,8 @@ struct ChatEnvelopeForwardSecrecyTests {
 
     @Test("Max payload size is correct")
     func testMaxPayloadSize() {
-        // 1024 byte note - 126 byte header - 16 byte tag = 882
-        #expect(ChatEnvelope.maxPayloadSize == 882)
+        // 4096 byte note - 126 byte header - 16 byte tag = 3954
+        #expect(ChatEnvelope.maxPayloadSize == 3954)
     }
 
     @Test("Decode fails for unsupported version")
@@ -365,8 +365,8 @@ struct EncryptionTests {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // Create a message larger than max payload size (882 bytes)
-        let largeMessage = String(repeating: "A", count: 1000)
+        // Create a message larger than the maximum payload
+        let largeMessage = String(repeating: "A", count: ChatEnvelope.maxPayloadSize + 1)
 
         #expect(throws: ChatError.self) {
             _ = try MessageEncryptor.encrypt(
@@ -477,7 +477,6 @@ struct EdgeCaseTests {
         let senderKey = Curve25519.KeyAgreement.PrivateKey()
         let recipientKey = Curve25519.KeyAgreement.PrivateKey()
 
-        // Max payload is 882 bytes
         let maxMessage = String(repeating: "A", count: ChatEnvelope.maxPayloadSize)
 
         let envelope = try MessageEncryptor.encrypt(

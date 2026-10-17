@@ -17,12 +17,12 @@ The package SHALL expose the Swift 6 `AlgoChat` library and `algochat` executabl
 
 ### REQ-algochat-002
 
-Standard envelopes SHALL encode version `0x01` and protocol `0x01`, validate the 32-byte static and ephemeral public keys, 12-byte nonce, 48-byte wrapped sender key, 126-byte header, and 1,024-byte note ceiling, and reject unsupported or truncated data.
+Standard envelopes SHALL encode version `0x01` and protocol `0x01`, validate the 32-byte static and ephemeral public keys, 12-byte nonce, 48-byte wrapped sender key, 126-byte header, and 4,096-byte note ceiling, and reject unsupported or truncated data.
 
 #### Acceptance Criteria
 
 - Standard envelope round trips preserve every field and reject invalid version, protocol, size, or length.
-- Encoded standard notes remain within 1,024 bytes.
+- An 882-byte plaintext still encodes. A maximum plaintext encodes to exactly 4,096 bytes. One extra byte is rejected before a transaction is sent.
 
 ### REQ-algochat-003
 
@@ -44,11 +44,12 @@ Messages and conversations SHALL preserve transaction identity, sender, recipien
 
 ### REQ-algochat-005
 
-Blockchain integration SHALL create and sign payment transactions containing valid note payloads, default to 1,000 microAlgos unless overridden, publish discoverable public-key metadata, page indexer searches, filter key-publication records, and optionally wait for confirmation and indexer visibility.
+Blockchain integration SHALL create and sign payment transactions containing valid note payloads, default to 1,000 microAlgos unless overridden, set the fee to the consensus note fee for that note, publish discoverable public-key metadata, page indexer searches, filter key-publication records, and optionally wait for confirmation and indexer visibility.
 
 #### Acceptance Criteria
 
-- Transaction construction honors default and custom payment amounts without exceeding note limits.
+- Transaction construction honors default and custom payment amounts without exceeding the 4,096-byte note limit.
+- At a minimum fee of 1,000 microAlgos, a 1,024-byte note costs 1,000, a 2,000-byte note costs 1,098, and a 4,096-byte note costs 1,308.
 - Indexer tests cover paging, key discovery, publication filtering, confirmation, and visibility waits.
 
 ### REQ-algochat-006
@@ -62,11 +63,12 @@ PSK exchange URIs and contacts SHALL round-trip a valid Algorand address, exactl
 
 ### REQ-algochat-007
 
-PSK envelopes SHALL use protocol `0x02`, encode a big-endian 32-bit counter in a 130-byte header, combine ratcheted PSK material with ephemeral ECDH, enforce the 1,024-byte note ceiling, and authenticate before exposing plaintext.
+PSK envelopes SHALL use protocol `0x02`, encode a big-endian 32-bit counter in a 130-byte header, combine ratcheted PSK material with ephemeral ECDH, enforce the 4,096-byte note ceiling, and authenticate before exposing plaintext.
 
 #### Acceptance Criteria
 
 - PSK envelope round trips preserve its counter and fields while respecting the note ceiling.
+- An 878-byte plaintext still encodes. A maximum PSK plaintext encodes to exactly 4,096 bytes.
 - Tampering, invalid framing, or incorrect key material fails before plaintext is exposed.
 
 ### REQ-algochat-008
@@ -107,10 +109,10 @@ Key and PSK storage SHALL preserve private key confidentiality and durable state
 
 ### REQ-algochat-012
 
-Verification SHALL build the owned library target and CLI product, run the 68-test cryptographic batch and 169-test unit and envelope-security batch, validate every governed source file and exported symbol at 100% SpecSync coverage, require the Codex integration to invoke the repository's strict 100% coverage command, and make no semantic changes to `Sources/` or `Tests/` during this migration.
+Verification SHALL build the owned library target and CLI product, run the 70-test cryptographic batch and 172-test unit and envelope-security batch, validate every governed source file and exported symbol at 100% SpecSync coverage, require the Codex integration to invoke the repository's strict 100% coverage command, and make no semantic changes to `Sources/` or `Tests/` during this migration.
 
 #### Acceptance Criteria
 
-- The Fledge lane passes 68 cryptographic tests, 169 other unit and envelope-security tests, and the noninteractive CLI product build.
+- The Fledge lane passes 70 cryptographic tests, 172 other unit and envelope-security tests, and the noninteractive CLI product build.
 - The Codex SpecSync skill invokes `specsync check --strict --require-coverage 100 --force` during PR validation.
 - SpecSync strict coverage and quality score are 100%, with no changes under `Sources/` or `Tests/`.

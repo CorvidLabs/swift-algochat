@@ -82,7 +82,7 @@ AlgoChat provides the following security properties:
 ```
 
 - **Total overhead:** 142 bytes (126-byte header + 16-byte auth tag)
-- **Maximum plaintext:** 882 bytes per message
+- **Maximum plaintext:** 3954 bytes per message (3950 bytes in PSK mode)
 
 ## Security Assumptions
 

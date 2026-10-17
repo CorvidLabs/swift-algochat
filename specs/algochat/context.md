@@ -19,7 +19,7 @@ spec: algochat.spec.md
 
 ## Current Status
 
-The implemented package builds under Swift 6. Its deterministic verification lane passes 68 cryptographic tests, 169 other unit and envelope-security tests, and a separate CLI product build. LocalNet integration remains an explicit environment-dependent workflow rather than part of this migration gate.
+The implemented package builds under Swift 6. Its deterministic verification lane passes 70 cryptographic tests, 172 other unit and envelope-security tests, and a separate CLI product build. LocalNet integration remains an explicit environment-dependent workflow rather than part of this migration gate.
 
 ## Operational Notes
 

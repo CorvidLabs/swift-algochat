@@ -175,7 +175,7 @@ struct KeyVerificationTests {
         expectedNote.append(signature)
 
         #expect(expectedNote.count == envelopeData.count + 64)
-        #expect(expectedNote.count <= 1024) // Fits in Algorand note field
+        #expect(expectedNote.count <= 4096) // Fits in the Algorand note field
     }
 
     // MARK: - DiscoveredKey Tests

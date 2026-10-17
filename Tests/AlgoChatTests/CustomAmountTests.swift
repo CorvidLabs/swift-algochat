@@ -178,6 +178,98 @@ struct CustomAmountTests {
         #expect(options.amount == nil)
         #expect(options.replyContext != nil)
     }
+
+    // MARK: - Note Fee
+
+    @Test("Note fee at minFee 1000 is 1000, 1098, and 1308")
+    func testNoteFeeAtMinFee1000() throws {
+        #expect(MessageTransaction.fee(noteBytes: 1024, minFee: 1000) == 1000)
+        #expect(MessageTransaction.fee(noteBytes: 2000, minFee: 1000) == 1098)
+        #expect(MessageTransaction.fee(noteBytes: 4096, minFee: 1000) == 1308)
+
+        let params = try suggestedParams(minFee: 1000)
+        let sender = try ChatAccount()
+        let recipient = try ChatAccount().address
+        let cases: [(Int, UInt64)] = [(1024, 1000), (2000, 1098), (4096, 1308)]
+        for (noteBytes, expected) in cases {
+            let envelope = sampleEnvelope(ciphertextBytes: noteBytes - ChatEnvelope.headerSize)
+            let tx = try MessageTransaction.create(
+                from: sender,
+                to: recipient,
+                envelope: envelope,
+                params: params
+            )
+            #expect(envelope.encode().count == noteBytes)
+            #expect(tx.fee.value == expected)
+        }
+
+        let psk = PSKEnvelope(
+            ratchetCounter: 1,
+            senderPublicKey: Data(repeating: 0x01, count: 32),
+            ephemeralPublicKey: Data(repeating: 0x02, count: 32),
+            nonce: Data(repeating: 0x04, count: 12),
+            encryptedSenderKey: Data(repeating: 0x03, count: 48),
+            ciphertext: Data(repeating: 0x05, count: 2000 - PSKEnvelope.headerSize)
+        )
+        let pskTx = try MessageTransaction.create(
+            from: sender,
+            to: recipient,
+            envelope: psk,
+            params: params
+        )
+        #expect(psk.encode().count == 2000)
+        #expect(pskTx.fee.value == 1098)
+
+        let signature = try SignatureVerifier.sign(
+            encryptionPublicKey: sender.encryptionPublicKey.rawRepresentation,
+            with: sender.account
+        )
+        let published = sampleEnvelope(ciphertextBytes: 16)
+        let signed = try MessageTransaction.createSignedKeyPublish(
+            from: sender,
+            envelope: published,
+            keySignature: signature,
+            params: params
+        )
+        let publishedNoteBytes = published.encode().count + signature.count
+        #expect(signed.transaction.fee.value == MessageTransaction.fee(noteBytes: publishedNoteBytes, minFee: 1000))
+    }
+
+    @Test("A 4097-byte note is refused before it is sent")
+    func testNoteOneByteOverCeiling() throws {
+        let params = try suggestedParams(minFee: 1000)
+        let sender = try ChatAccount()
+        let recipient = try ChatAccount().address
+        let envelope = sampleEnvelope(ciphertextBytes: ChatEnvelope.maxNoteSize - ChatEnvelope.headerSize + 1)
+        #expect(envelope.encode().count == 4097)
+        #expect(throws: ChatError.self) {
+            _ = try MessageTransaction.create(
+                from: sender,
+                to: recipient,
+                envelope: envelope,
+                params: params
+            )
+        }
+    }
+
+    private func sampleEnvelope(ciphertextBytes: Int) -> ChatEnvelope {
+        ChatEnvelope(
+            senderPublicKey: Data(repeating: 0x01, count: 32),
+            ephemeralPublicKey: Data(repeating: 0x02, count: 32),
+            encryptedSenderKey: Data(repeating: 0x03, count: 48),
+            nonce: Data(repeating: 0x04, count: 12),
+            ciphertext: Data(repeating: 0x05, count: ciphertextBytes)
+        )
+    }
+
+    private func suggestedParams(minFee: UInt64) throws -> TransactionParams {
+        let genesisHash = Data(repeating: 0, count: 32).base64EncodedString()
+        let json = """
+        {"consensus-version":"v1","min-fee":\(minFee),"genesis-id":"testnet-v1.0",\
+        "genesis-hash":"\(genesisHash)","last-round":1}
+        """
+        return try JSONDecoder().decode(TransactionParams.self, from: Data(json.utf8))
+    }
 }
 
 // MARK: - Localnet Integration Tests

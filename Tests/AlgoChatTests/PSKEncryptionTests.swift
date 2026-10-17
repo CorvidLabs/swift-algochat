@@ -266,26 +266,43 @@ struct PSKEncryptionTests {
 
     // MARK: - Envelope Size
 
-    @Test("PSK envelope fits within 1024-byte Algorand note limit")
-    func testEnvelopeFitsInNote() throws {
+    @Test("An 878-byte PSK plaintext still encodes inside 1024 bytes")
+    func testLegacyPlaintextEncodes() throws {
         let sender = Curve25519.KeyAgreement.PrivateKey()
         let recipient = Curve25519.KeyAgreement.PrivateKey()
         let currentPSK = PSKRatchet.derivePSKAtCounter(
             initialPSK: Data(repeating: 0xAA, count: 32), counter: 0
         )
 
-        // Max payload message
-        let maxMessage = String(repeating: "A", count: 878)
         let envelope = try MessageEncryptor.encryptPSK(
-            message: maxMessage,
+            message: String(repeating: "A", count: 878),
             senderPrivateKey: sender,
             recipientPublicKey: recipient.publicKey,
             currentPSK: currentPSK,
             ratchetCounter: 0
         )
 
-        let encoded = envelope.encode()
-        #expect(encoded.count <= 1024, "Encoded envelope must fit in 1024-byte note field")
+        #expect(envelope.encode().count == 1024)
+        #expect(envelope.encode().count <= ChatEnvelope.maxNoteSize)
+    }
+
+    @Test("Maximum PSK plaintext encodes to exactly 4096 bytes")
+    func testMaximumPlaintextEncodesToNoteLimit() throws {
+        let sender = Curve25519.KeyAgreement.PrivateKey()
+        let recipient = Curve25519.KeyAgreement.PrivateKey()
+        let currentPSK = PSKRatchet.derivePSKAtCounter(
+            initialPSK: Data(repeating: 0xAA, count: 32), counter: 0
+        )
+
+        let envelope = try MessageEncryptor.encryptPSK(
+            message: String(repeating: "A", count: PSKEnvelope.maxPayloadSize),
+            senderPrivateKey: sender,
+            recipientPublicKey: recipient.publicKey,
+            currentPSK: currentPSK,
+            ratchetCounter: 0
+        )
+
+        #expect(envelope.encode().count == 4096)
     }
 
     @Test("Oversized PSK message throws error")
@@ -296,7 +313,7 @@ struct PSKEncryptionTests {
             initialPSK: Data(repeating: 0xAA, count: 32), counter: 0
         )
 
-        let tooLong = String(repeating: "A", count: 879)
+        let tooLong = String(repeating: "A", count: PSKEnvelope.maxPayloadSize + 1)
         #expect(throws: ChatError.self) {
             _ = try MessageEncryptor.encryptPSK(
                 message: tooLong,

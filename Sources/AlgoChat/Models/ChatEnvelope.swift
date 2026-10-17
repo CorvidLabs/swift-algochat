@@ -11,7 +11,8 @@ import Foundation
  - Nonce: 12 bytes (ChaCha20-Poly1305)
  - Encrypted Sender Key: 48 bytes (symmetric key encrypted for sender + tag)
  - Ciphertext + Tag: remaining bytes
- - Overhead: 142 bytes (126-byte header + 16-byte tag), max message: 882 bytes
+ - Overhead: 142 bytes (126-byte header + 16-byte tag)
+ - Maximum plaintext is the note ceiling minus the header and tag
  - Both sender and recipient can decrypt their own messages
  */
 public struct ChatEnvelope: Sendable {
@@ -23,6 +24,9 @@ public struct ChatEnvelope: Sendable {
     /// AlgoChat protocol identifier
     public static let protocolID: UInt8 = 0x01
 
+    /// Algorand consensus note ceiling, in bytes. Shared by every envelope.
+    public static let maxNoteSize = 4096
+
     /// Size of the header (version + protocol + static pubkey + ephemeral pubkey + nonce + encrypted sender key)
     public static let headerSize = 126
 
@@ -32,8 +36,8 @@ public struct ChatEnvelope: Sendable {
     /// Size of the Poly1305 authentication tag
     public static let tagSize = 16
 
-    /// Maximum size of the encrypted payload
-    public static let maxPayloadSize = 1024 - headerSize - tagSize  // 882 bytes
+    /// Maximum size of the plaintext payload
+    public static let maxPayloadSize = maxNoteSize - headerSize - tagSize
 
     // MARK: - Properties
 

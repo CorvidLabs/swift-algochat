@@ -54,7 +54,37 @@ struct ChatEnvelopeValidationTests {
         )
 
         let encoded = envelope.encode()
-        #expect(encoded.count <= 1024)  // Algorand note field limit
+        #expect(encoded.count == 4096)
+    }
+
+    @Test("An 882-byte plaintext still encodes")
+    func testLegacyPlaintextEncodes() throws {
+        let senderKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+
+        let envelope = try MessageEncryptor.encrypt(
+            message: String(repeating: "x", count: 882),
+            senderPrivateKey: senderKey,
+            recipientPublicKey: recipientKey.publicKey
+        )
+
+        let encoded = envelope.encode()
+        #expect(encoded.count == 1024)
+        #expect(encoded.count <= ChatEnvelope.maxNoteSize)
+    }
+
+    @Test("One byte past the maximum plaintext is refused before send")
+    func testOneBytePastMaximumThrowsBeforeSend() throws {
+        let senderKey = Curve25519.KeyAgreement.PrivateKey()
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+
+        #expect(throws: ChatError.self) {
+            _ = try MessageEncryptor.encrypt(
+                message: String(repeating: "x", count: ChatEnvelope.maxPayloadSize + 1),
+                senderPrivateKey: senderKey,
+                recipientPublicKey: recipientKey.publicKey
+            )
+        }
     }
 
     @Test("Envelope rejects payload over maximum size")
