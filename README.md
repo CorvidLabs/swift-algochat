@@ -1,3 +1,5 @@
+> **This repository has moved.** Development continues in [CorvidLabs/algochat](https://github.com/CorvidLabs/algochat) in the [`swift/`](https://github.com/CorvidLabs/algochat/tree/main/swift) directory. This copy stays public so existing package versions keep resolving. Open new work in the monorepo.
+
 # swift-algochat
 
 [![macOS](https://img.shields.io/github/actions/workflow/status/CorvidLabs/swift-algochat/macOS.yml?label=macOS&branch=main)](https://github.com/CorvidLabs/swift-algochat/actions/workflows/macOS.yml)
